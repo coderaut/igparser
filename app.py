@@ -10,7 +10,7 @@ from downloader import download_reel
 from transcriber import extract_audio, transcribe_audio
 from caption import fetch_caption
 from detector import detect_content_type, CONTENT_TYPES
-from extractor import extract_content
+from content_extractor import extract_content
 
 load_dotenv()
 

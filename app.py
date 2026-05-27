@@ -122,11 +122,35 @@ if st.session_state.result_md:
             f"""
             <script>
             function copyMd() {{
-                navigator.clipboard.writeText(atob("{b64}")).then(function() {{
-                    var b = document.getElementById("cb");
-                    b.textContent = "✓ Copied!";
-                    setTimeout(function() {{ b.textContent = "Copy to clipboard"; }}, 2000);
-                }});
+                var text = atob("{b64}");
+                var btn = document.getElementById("cb");
+                if (navigator.clipboard && window.isSecureContext) {{
+                    navigator.clipboard.writeText(text).then(function() {{
+                        showDone(btn);
+                    }}).catch(function() {{ fallback(text, btn); }});
+                }} else {{
+                    fallback(text, btn);
+                }}
+            }}
+            function fallback(text, btn) {{
+                var ta = document.getElementById("ta");
+                ta.value = text;
+                ta.style.display = "block";
+                ta.focus();
+                ta.setSelectionRange(0, ta.value.length);
+                try {{
+                    var ok = document.execCommand("copy");
+                    if (ok) {{
+                        ta.style.display = "none";
+                        showDone(btn);
+                        return;
+                    }}
+                }} catch(e) {{}}
+                btn.textContent = "Long-press the text below to copy";
+            }}
+            function showDone(btn) {{
+                btn.textContent = "✓ Copied!";
+                setTimeout(function() {{ btn.textContent = "Copy to clipboard"; }}, 2000);
             }}
             </script>
             <button id="cb" onclick="copyMd()"
@@ -134,7 +158,10 @@ if st.session_state.result_md:
                        border-radius:6px;cursor:pointer;font-size:14px;font-family:sans-serif;">
                 Copy to clipboard
             </button>
+            <textarea id="ta" readonly
+                style="display:none;width:100%;height:120px;margin-top:10px;
+                       font-size:12px;font-family:monospace;box-sizing:border-box;"></textarea>
             """,
-            height=45,
+            height=50,
         )
         st.code(st.session_state.result_md, language="markdown")

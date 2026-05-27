@@ -10,7 +10,7 @@ Pipeline (in order):
 2. `caption.py` — Instagram oEmbed API fallback for caption; only used if yt-dlp returned no description
 3. `transcriber.py` — `ffmpeg` strips audio to mono 16 kHz MP3, then sends it base64-encoded to OpenRouter Whisper Large V3. Skipped silently for static image posts or videos with no audio track.
 4. `detector.py` — LLM classifies the content as `recipe`, `movie`, `book`, or `place` using both caption and transcript
-5. `extractor.py` — Type-specific prompt sent to LLM via OpenRouter using both caption and transcript; returns structured markdown
+5. `content_extractor.py` — Type-specific prompt sent to LLM via OpenRouter using both caption and transcript; returns structured markdown
 6. Cleanup — temp files deleted; CLI saves to `output/<slug>.md`, dashboard is in-memory only
 
 ## Entry points
@@ -18,7 +18,7 @@ Pipeline (in order):
 | Mode | Command |
 |------|---------|
 | Streamlit dashboard | `streamlit run app.py` → `http://localhost:8501` |
-| CLI | `igrecipe <url> [--type auto|recipe|movie|book|place] [--lang code] [--output dir]` |
+| CLI | `igrecipe <url> [--type auto|recipe|movie|book|place] [--output dir]` |
 
 CLI is registered via `pyproject.toml` as `igrecipe = "main:app"`.
 
@@ -59,7 +59,7 @@ downloader.py     yt-dlp wrapper; reads COOKIES_FILE env var; returns (video_pat
 transcriber.py    ffmpeg audio strip + OpenRouter Whisper call
 caption.py        Instagram oEmbed fetch → fallback caption if yt-dlp returned nothing
 detector.py       LLM classifier → returns one of: recipe, movie, book, place
-extractor.py      Type-specific LLM prompts → returns (markdown, slug)
+content_extractor.py  Type-specific LLM prompts → returns (markdown, slug)
 pyproject.toml    Package config; CLI script registered here
 cookies/          Place instagram.txt here — git-ignored, Docker-mounted
 ```
@@ -67,7 +67,7 @@ cookies/          Place instagram.txt here — git-ignored, Docker-mounted
 ## Models used (via OpenRouter)
 
 - Transcription: `openai/whisper-large-v3` (in `transcriber.py`)
-- Detection + extraction: `google/gemma-4-31b-it` (in `detector.py` and `extractor.py`)
+- Detection + extraction: `google/gemma-4-31b-it` (in `detector.py` and `content_extractor.py`)
 
 To swap models, change the constants at the top of each file.
 
@@ -80,7 +80,7 @@ To swap models, change the constants at the top of each file.
 | book | Author/Genre, What It's About, Why Read It, Notes |
 | place | Location/Type, Why Visit, Tips, Notes |
 
-To add a new content type: add an entry to `_PROMPTS` in `extractor.py`, add it to `CONTENT_TYPES` in `detector.py`, and update the classifier system prompt.
+To add a new content type: add an entry to `_PROMPTS` in `content_extractor.py`, add it to `CONTENT_TYPES` in `detector.py`, and update the classifier system prompt.
 
 ## Key constraints
 

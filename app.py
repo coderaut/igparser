@@ -1,9 +1,11 @@
+import base64
 import os
 import shutil
 import tempfile
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
 from downloader import download_reel
@@ -32,11 +34,6 @@ url = st.text_input(
     "Instagram URL",
     placeholder="https://www.instagram.com/reel/... or /p/...",
 )
-lang = st.text_input(
-    "Language hint (optional)",
-    placeholder="hi, ta, gu — leave blank for auto-detect",
-)
-
 generate = st.button("Extract", type="primary", disabled=not url.strip())
 
 if "result_md" not in st.session_state:
@@ -75,7 +72,7 @@ if generate and url.strip():
                 try:
                     st.write("Transcribing audio...")
                     transcript = transcribe_audio(
-                        audio_path, openrouter_key, language=lang.strip() or None
+                        audio_path, openrouter_key, language=None
                     )
                     if transcript:
                         st.write(f"Transcript obtained ({len(transcript)} chars).")
@@ -120,4 +117,24 @@ if st.session_state.result_md:
     with tab_rendered:
         st.markdown(st.session_state.result_md)
     with tab_markdown:
+        b64 = base64.b64encode(st.session_state.result_md.encode()).decode()
+        components.html(
+            f"""
+            <script>
+            function copyMd() {{
+                navigator.clipboard.writeText(atob("{b64}")).then(function() {{
+                    var b = document.getElementById("cb");
+                    b.textContent = "✓ Copied!";
+                    setTimeout(function() {{ b.textContent = "Copy to clipboard"; }}, 2000);
+                }});
+            }}
+            </script>
+            <button id="cb" onclick="copyMd()"
+                style="background:#ff4b4b;color:white;border:none;padding:8px 20px;
+                       border-radius:6px;cursor:pointer;font-size:14px;font-family:sans-serif;">
+                Copy to clipboard
+            </button>
+            """,
+            height=45,
+        )
         st.code(st.session_state.result_md, language="markdown")

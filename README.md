@@ -70,7 +70,7 @@ yt-dlp will pick this up automatically.
 streamlit run app.py
 ```
 
-Opens a browser at `http://localhost:8501`. Paste a Reel or post URL, click **Extract**, and the result is rendered with a tab to copy the raw markdown. Nothing is saved to disk.
+Opens a browser at `http://localhost:8501`. Paste a Reel or post URL, click **Extract**, and the result is rendered with a tab to copy the raw markdown directly to clipboard. Nothing is saved to disk.
 
 ### CLI
 
@@ -91,11 +91,6 @@ igrecipe <url> --type place
 
 # Save to a custom output directory
 igrecipe <url> --output ~/notes
-
-# Language hint for Whisper (helps with non-English audio)
-igrecipe <url> --lang hi   # Hindi
-igrecipe <url> --lang ta   # Tamil
-igrecipe <url> --lang gu   # Gujarati
 ```
 
 ---
@@ -139,7 +134,7 @@ igparser/
 ├── transcriber.py    # ffmpeg audio strip + OpenRouter Whisper call
 ├── caption.py        # Instagram oEmbed caption fetch
 ├── detector.py       # LLM content-type classifier
-├── extractor.py      # Type-specific LLM extraction prompts
+├── content_extractor.py  # Type-specific LLM extraction prompts
 ├── Dockerfile
 ├── docker-compose.yml
 ├── cookies/          # Place instagram.txt here (git-ignored)

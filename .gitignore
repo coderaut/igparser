@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 *.pyo
 output/
+cookies/*.txt
 *.egg-info/
 dist/
 build/

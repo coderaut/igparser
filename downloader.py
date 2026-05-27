@@ -1,5 +1,8 @@
+import os
 from pathlib import Path
 import yt_dlp
+
+_COOKIES_FILE = os.getenv("COOKIES_FILE", "cookies.txt")
 
 
 def download_reel(url: str, work_dir: Path) -> Path:
@@ -14,6 +17,10 @@ def download_reel(url: str, work_dir: Path) -> Path:
         "no_warnings": True,
         "merge_output_format": "mp4",
     }
+
+    cookies = Path(_COOKIES_FILE)
+    if cookies.exists():
+        ydl_opts["cookiefile"] = str(cookies)
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

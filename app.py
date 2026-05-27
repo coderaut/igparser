@@ -57,11 +57,11 @@ if generate and url.strip():
     with st.status("Working...", expanded=True) as status:
         try:
             st.write("Downloading post...")
-            video_path = download_reel(url.strip(), WORK_DIR)
+            video_path, yt_caption = download_reel(url.strip(), WORK_DIR)
             st.write("Post downloaded.")
 
             st.write("Fetching caption...")
-            caption = fetch_caption(url.strip())
+            caption = yt_caption or fetch_caption(url.strip())
             if caption:
                 st.write(f"Caption found ({len(caption)} chars).")
             else:

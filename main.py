@@ -52,13 +52,13 @@ def main(
     try:
         typer.echo("Downloading post...")
         try:
-            video_path = download_reel(url, work_dir)
+            video_path, yt_caption = download_reel(url, work_dir)
         except RuntimeError as e:
             typer.echo(f"Error: {e}", err=True)
             raise typer.Exit(1)
 
         typer.echo("Fetching caption...")
-        caption = fetch_caption(url)
+        caption = yt_caption or fetch_caption(url)
         if caption:
             typer.echo(f"Caption found ({len(caption)} chars).")
         else:

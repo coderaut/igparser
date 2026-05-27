@@ -5,8 +5,13 @@ import yt_dlp
 _COOKIES_FILE = os.getenv("COOKIES_FILE", "cookies.txt")
 
 
-def download_reel(url: str, work_dir: Path) -> Path:
-    """Download an Instagram reel and return the local video file path."""
+def download_reel(url: str, work_dir: Path) -> tuple[Path, str]:
+    """Download an Instagram reel and return (video_path, caption).
+
+    Caption is extracted from yt-dlp metadata (description field) which is more
+    reliable than the oEmbed API since it uses the same cookies/auth as the download.
+    Returns empty string for caption if unavailable.
+    """
     work_dir.mkdir(parents=True, exist_ok=True)
     output_template = str(work_dir / "reel.%(ext)s")
 
@@ -32,6 +37,7 @@ def download_reel(url: str, work_dir: Path) -> Path:
                 video_path = work_dir / "reel.mp4"
             if not video_path.exists():
                 raise FileNotFoundError("Downloaded video file not found in work directory.")
-            return video_path
+            caption = (info.get("description") or "").strip()
+            return video_path, caption
     except yt_dlp.utils.DownloadError as e:
         raise RuntimeError(f"yt-dlp failed to download the reel: {e}") from e

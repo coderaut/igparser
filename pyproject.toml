@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [tool.setuptools]
-py-modules = ["main", "downloader", "transcriber", "caption", "recipe"]
+py-modules = ["main", "downloader", "transcriber", "caption", "detector", "extractor"]
 
 [project.scripts]
 igrecipe = "main:app"

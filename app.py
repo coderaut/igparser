@@ -9,30 +9,40 @@ from dotenv import load_dotenv
 from downloader import download_reel
 from transcriber import extract_audio, transcribe_audio
 from caption import fetch_caption
-from recipe import extract_recipe
+from detector import detect_content_type, CONTENT_TYPES
+from extractor import extract_content
 
 load_dotenv()
 
 WORK_DIR = Path(tempfile.gettempdir()) / "igrecipe"
 
-st.set_page_config(page_title="igrecipe", layout="centered")
+TYPE_LABELS = {
+    "recipe": "Recipe",
+    "movie": "Movie / Show",
+    "book": "Book",
+    "place": "Place to Visit",
+}
 
-st.title("igrecipe")
-st.caption("Paste a public Instagram Reel URL to extract a clean recipe.")
+st.set_page_config(page_title="ig parser", layout="centered")
+
+st.title("ig parser")
+st.caption("Paste a public Instagram Reel or post URL to extract a clean summary.")
 
 url = st.text_input(
-    "Instagram Reel URL",
-    placeholder="https://www.instagram.com/reel/...",
+    "Instagram URL",
+    placeholder="https://www.instagram.com/reel/... or /p/...",
 )
 lang = st.text_input(
     "Language hint (optional)",
     placeholder="hi, ta, gu — leave blank for auto-detect",
 )
 
-generate = st.button("Generate Recipe", type="primary", disabled=not url.strip())
+generate = st.button("Extract", type="primary", disabled=not url.strip())
 
-if "recipe_md" not in st.session_state:
-    st.session_state.recipe_md = None
+if "result_md" not in st.session_state:
+    st.session_state.result_md = None
+if "detected_type" not in st.session_state:
+    st.session_state.detected_type = None
 
 if generate and url.strip():
     openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
@@ -40,66 +50,59 @@ if generate and url.strip():
         st.error("OPENROUTER_API_KEY is not set in your .env file.")
         st.stop()
 
-    st.session_state.recipe_md = None
+    st.session_state.result_md = None
+    st.session_state.detected_type = None
     error = None
-
-    STEPS = [
-        "Downloading reel",
-        "Fetching caption",
-        "Extracting audio",
-        "Transcribing audio",
-        "Extracting recipe",
-        "Done!",
-    ]
-    progress_bar = st.progress(0, text=STEPS[0])
-
-    def advance(step: int, message: str) -> None:
-        progress_bar.progress((step + 1) / len(STEPS), text=message)
 
     with st.status("Working...", expanded=True) as status:
         try:
-            st.write("Downloading reel...")
+            st.write("Downloading post...")
             video_path = download_reel(url.strip(), WORK_DIR)
-            st.write("Reel downloaded.")
-            advance(0, STEPS[1])
+            st.write("Post downloaded.")
 
             st.write("Fetching caption...")
             caption = fetch_caption(url.strip())
             if caption:
                 st.write(f"Caption found ({len(caption)} chars).")
             else:
-                st.write("No caption found — continuing with transcript only.")
-            advance(1, STEPS[2])
+                st.write("No caption found — continuing without it.")
 
-            st.write("Extracting audio...")
-            audio_path = extract_audio(video_path, WORK_DIR)
-            st.write("Audio extracted.")
-            advance(2, STEPS[3])
-
-            st.write("Transcribing audio...")
-            transcript = transcribe_audio(
-                audio_path, openrouter_key, language=lang.strip() or None
-            )
-            if transcript:
-                st.write(f"Transcript obtained ({len(transcript)} chars).")
-            else:
-                st.write("Transcript is empty.")
-            advance(3, STEPS[4])
+            transcript = ""
+            try:
+                st.write("Extracting audio...")
+                audio_path = extract_audio(video_path, WORK_DIR)
+                st.write("Audio extracted.")
+                try:
+                    st.write("Transcribing audio...")
+                    transcript = transcribe_audio(
+                        audio_path, openrouter_key, language=lang.strip() or None
+                    )
+                    if transcript:
+                        st.write(f"Transcript obtained ({len(transcript)} chars).")
+                    else:
+                        st.write("Transcript is empty.")
+                except RuntimeError as e:
+                    st.write(f"Transcription failed: {e}")
+            except (RuntimeError, FileNotFoundError):
+                st.write("No audio track — using caption only.")
 
             if not transcript and not caption:
-                raise ValueError("Both transcript and caption are empty — cannot extract a recipe.")
+                raise ValueError("No caption or transcript available — cannot extract content.")
 
-            st.write("Extracting recipe...")
-            recipe_md, slug = extract_recipe(transcript, caption or "", openrouter_key)
-            st.write("Recipe extracted.")
-            advance(5, "Done!")
+            st.write("Detecting content type...")
+            detected = detect_content_type(transcript, caption or "", openrouter_key)
+            label = TYPE_LABELS.get(detected, detected.title())
+            st.write(f"Detected: **{label}**")
+            st.session_state.detected_type = detected
 
-            st.session_state.recipe_md = recipe_md
+            st.write(f"Extracting {label.lower()}...")
+            result_md, _ = extract_content(detected, transcript, caption or "", openrouter_key)
+
+            st.session_state.result_md = result_md
             status.update(label="Done!", state="complete", expanded=False)
 
         except Exception as e:
             error = str(e)
-            progress_bar.empty()
             status.update(label="Something went wrong.", state="error", expanded=True)
 
         finally:
@@ -108,12 +111,13 @@ if generate and url.strip():
     if error:
         st.error(error)
 
-if st.session_state.recipe_md:
+if st.session_state.result_md:
+    detected_type = st.session_state.detected_type
     st.divider()
-    tab_recipe, tab_markdown = st.tabs(["Recipe", "Copy Markdown"])
-
-    with tab_recipe:
-        st.markdown(st.session_state.recipe_md)
-
+    if detected_type:
+        st.caption(f"Type: {TYPE_LABELS.get(detected_type, detected_type.title())}")
+    tab_rendered, tab_markdown = st.tabs(["Rendered", "Copy Markdown"])
+    with tab_rendered:
+        st.markdown(st.session_state.result_md)
     with tab_markdown:
-        st.code(st.session_state.recipe_md, language="markdown")
+        st.code(st.session_state.result_md, language="markdown")

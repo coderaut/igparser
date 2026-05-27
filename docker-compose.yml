@@ -9,4 +9,4 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - COOKIES_FILE=/cookies/instagram.txt
     volumes:
-      - ./cookies:/cookies:ro
+      - ./cookies:/cookies

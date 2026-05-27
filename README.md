@@ -1,8 +1,10 @@
-# igrecipe
+# ig parser
 
-A local tool that downloads an Instagram cooking reel and extracts a clean, formatted recipe.
+Downloads public Instagram Reels and static posts and extracts clean, structured markdown summaries.
 
-It downloads the video, strips the audio, transcribes it with Whisper via OpenRouter, fetches the post caption, then uses an LLM to synthesise everything into a markdown recipe.
+Supports four content types — **recipes, movies/shows, books, and places to visit** — auto-detected via LLM.
+
+It downloads the post, strips the audio (if video), transcribes it with Whisper via OpenRouter, fetches the caption, detects the content type, then uses an LLM to extract a structured markdown summary.
 
 ---
 
@@ -11,6 +13,7 @@ It downloads the video, strips the audio, transcribes it with Whisper via OpenRo
 - Python 3.11+
 - ffmpeg (must be on your PATH)
 - An [OpenRouter](https://openrouter.ai) API key
+- Instagram cookies file (for authenticated downloads — see [Cookies](#cookies))
 
 ### Installing ffmpeg
 
@@ -21,16 +24,14 @@ It downloads the video, strips the audio, transcribes it with Whisper via OpenRo
 | Windows (Chocolatey) | `choco install ffmpeg` |
 | Windows (Scoop) | `scoop install ffmpeg` |
 
-Verify with: `ffmpeg -version`
-
 ---
 
 ## Setup
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/coderaut/igrecipe
-cd igrecipe
+git clone https://github.com/coderaut/igparser
+cd igparser
 
 # 2. Create and activate a virtual environment
 python -m venv .venv
@@ -48,21 +49,20 @@ cp .env.example .env
 
 ---
 
+## Cookies
+
+Instagram requires authentication for downloads. Export your cookies from a logged-in browser session and save them as `cookies/instagram.txt`.
+
+1. Install the **Get cookies.txt LOCALLY** extension (Chrome/Firefox)
+2. Log into Instagram in your browser
+3. Click the extension and export cookies for `instagram.com`
+4. Save the file to `cookies/instagram.txt`
+
+yt-dlp will pick this up automatically.
+
+---
+
 ## Usage
-
-Every time you open a new terminal, activate the virtual environment first:
-
-```bash
-source .venv/bin/activate   # macOS/Linux
-.venv\Scripts\activate      # Windows
-```
-
-Or use the start scripts to do it in one step:
-
-```bash
-./start.sh      # macOS/Linux
-start.bat       # Windows (double-click or run from terminal)
-```
 
 ### Dashboard (recommended)
 
@@ -70,7 +70,7 @@ start.bat       # Windows (double-click or run from terminal)
 streamlit run app.py
 ```
 
-Opens a browser at `http://localhost:8501`. Paste a reel URL, click **Generate Recipe**, and the recipe is rendered with a tab to copy the raw markdown. Nothing is saved to disk — copy it directly into your notes.
+Opens a browser at `http://localhost:8501`. Paste a Reel or post URL, click **Extract**, and the result is rendered with a tab to copy the raw markdown. Nothing is saved to disk.
 
 ### CLI
 
@@ -78,53 +78,79 @@ Opens a browser at `http://localhost:8501`. Paste a reel URL, click **Generate R
 igrecipe https://www.instagram.com/reel/XXXXXXX/
 ```
 
-The recipe prints to the terminal and is saved to `output/<recipe-title>.md`.
+The summary prints to the terminal and is saved to `output/<title>.md`.
 
-### CLI optional flags
+### CLI flags
 
 ```bash
-# Save to a custom output directory
-igrecipe https://www.instagram.com/reel/XXXXXXX/ --output ~/recipes
+# Force a content type instead of auto-detecting
+igrecipe <url> --type recipe
+igrecipe <url> --type movie
+igrecipe <url> --type book
+igrecipe <url> --type place
 
-# Provide a language hint for Whisper (helps accuracy for non-English reels)
-igrecipe https://www.instagram.com/reel/XXXXXXX/ --lang hi   # Hindi
-igrecipe https://www.instagram.com/reel/XXXXXXX/ --lang ta   # Tamil
-igrecipe https://www.instagram.com/reel/XXXXXXX/ --lang gu   # Gujarati
+# Save to a custom output directory
+igrecipe <url> --output ~/notes
+
+# Language hint for Whisper (helps with non-English audio)
+igrecipe <url> --lang hi   # Hindi
+igrecipe <url> --lang ta   # Tamil
+igrecipe <url> --lang gu   # Gujarati
 ```
+
+---
+
+## Docker (Heimdall / self-hosted)
+
+```bash
+# 1. Add your API key
+echo "OPENROUTER_API_KEY=sk-or-..." > .env
+
+# 2. Add your Instagram cookies
+cp /path/to/instagram.txt cookies/instagram.txt
+
+# 3. Start
+docker compose up -d
+```
+
+Dashboard available at `http://localhost:8501` (bind via SSH tunnel: `ssh -L 8501:localhost:8501 user@host`).
 
 ---
 
 ## How it works
 
-1. **Download** — `yt-dlp` fetches the reel video to a temp directory.
-2. **Caption** — Instagram's public oEmbed API is queried for the post caption (no login needed).
-3. **Audio extraction** — `ffmpeg` strips audio to a mono 16 kHz MP3.
+1. **Download** — `yt-dlp` fetches the reel or post (video or image) to a temp directory, using cookies for auth.
+2. **Caption** — Instagram's oEmbed API is queried for the post caption.
+3. **Audio extraction** — `ffmpeg` strips audio to a mono 16 kHz MP3. Skipped silently for static image posts.
 4. **Transcription** — The audio is base64-encoded and sent to OpenRouter's Whisper Large V3 endpoint.
-5. **Recipe extraction** — Transcript + caption are sent to an LLM via OpenRouter, which returns a structured markdown recipe.
-6. **Cleanup** — All temp files are deleted. The dashboard shows the recipe in-browser only; the CLI saves it to `output/`.
-
----
-
-## Limitations
-
-- **Public reels only.** Private accounts, age-gated content, and geo-restricted reels will fail at the download step.
-- Caption fetching relies on Instagram's oEmbed endpoint, which may return no data for some posts.
-- Whisper transcription quality depends on audio clarity and background noise in the reel.
+5. **Detection** — Transcript + caption are classified as `recipe`, `movie`, `book`, or `place` by an LLM.
+6. **Extraction** — A type-specific prompt extracts a structured markdown summary.
+7. **Cleanup** — All temp files are deleted.
 
 ---
 
 ## Project structure
 
 ```
-igrecipe/
+igparser/
 ├── app.py            # Streamlit dashboard
-├── main.py           # CLI entrypoint (typer)
+├── main.py           # CLI entrypoint (igrecipe command)
 ├── downloader.py     # yt-dlp wrapper
 ├── transcriber.py    # ffmpeg audio strip + OpenRouter Whisper call
 ├── caption.py        # Instagram oEmbed caption fetch
-├── recipe.py         # LLM recipe extraction via OpenRouter
-├── start.sh          # Launch script for macOS/Linux
-├── start.bat         # Launch script for Windows
-├── .env.example      # API key template
+├── detector.py       # LLM content-type classifier
+├── extractor.py      # Type-specific LLM extraction prompts
+├── Dockerfile
+├── docker-compose.yml
+├── cookies/          # Place instagram.txt here (git-ignored)
 └── requirements.txt
 ```
+
+---
+
+## Limitations
+
+- **Public posts only.** Private accounts, age-gated, and geo-restricted content will fail at download.
+- Static image posts rely on caption only — no audio to transcribe.
+- Whisper accuracy depends on audio clarity and background noise.
+- Instagram cookies expire periodically and will need refreshing.

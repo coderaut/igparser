@@ -1,0 +1,9 @@
+services:
+  ig-parser:
+    build: .
+    container_name: ig-parser
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8501:8501"
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}

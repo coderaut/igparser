@@ -6,11 +6,11 @@ Supports four content types: recipes, movie/show recommendations, book recommend
 ## What it does
 
 Pipeline (in order):
-1. `downloader.py` — `yt-dlp` downloads the post (video or image) to a temp dir, using `cookies/instagram.txt` for auth if present
-2. `caption.py` — Instagram oEmbed API fetches the post caption (no auth needed)
-3. `transcriber.py` — `ffmpeg` strips audio to mono 16 kHz MP3, then sends it base64-encoded to OpenRouter Whisper Large V3. Skipped silently for static image posts.
-4. `detector.py` — LLM classifies the content as `recipe`, `movie`, `book`, or `place`
-5. `extractor.py` — Type-specific prompt sent to LLM via OpenRouter; returns structured markdown
+1. `downloader.py` — `yt-dlp` downloads the post (video or image) to a temp dir, using `cookies/instagram.txt` for auth if present; also returns the post caption from yt-dlp metadata (more reliable than oEmbed)
+2. `caption.py` — Instagram oEmbed API fallback for caption; only used if yt-dlp returned no description
+3. `transcriber.py` — `ffmpeg` strips audio to mono 16 kHz MP3, then sends it base64-encoded to OpenRouter Whisper Large V3. Skipped silently for static image posts or videos with no audio track.
+4. `detector.py` — LLM classifies the content as `recipe`, `movie`, `book`, or `place` using both caption and transcript
+5. `extractor.py` — Type-specific prompt sent to LLM via OpenRouter using both caption and transcript; returns structured markdown
 6. Cleanup — temp files deleted; CLI saves to `output/<slug>.md`, dashboard is in-memory only
 
 ## Entry points
@@ -55,9 +55,9 @@ SSH tunnel to access: `ssh -L 8501:localhost:8501 root@<ip>`
 ```
 app.py            Streamlit UI — runs the full pipeline, no file output
 main.py           CLI entrypoint (Typer) — saves output/<slug>.md
-downloader.py     yt-dlp wrapper; reads COOKIES_FILE env var
+downloader.py     yt-dlp wrapper; reads COOKIES_FILE env var; returns (video_path, caption)
 transcriber.py    ffmpeg audio strip + OpenRouter Whisper call
-caption.py        Instagram oEmbed fetch → returns caption string or None
+caption.py        Instagram oEmbed fetch → fallback caption if yt-dlp returned nothing
 detector.py       LLM classifier → returns one of: recipe, movie, book, place
 extractor.py      Type-specific LLM prompts → returns (markdown, slug)
 pyproject.toml    Package config; CLI script registered here

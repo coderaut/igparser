@@ -1,17 +1,17 @@
 # ig parser
 
-Downloads public Instagram Reels and static posts and extracts clean, structured markdown summaries.
+Downloads public Instagram Reels, static posts, and image carousels and extracts clean, structured markdown summaries.
 
 Supports four content types — **recipes, movies/shows, books, and places to visit** — auto-detected via LLM.
 
-It downloads the post, strips the audio (if video), transcribes it with Whisper via OpenRouter, fetches the caption, detects the content type, then uses an LLM to extract a structured markdown summary.
+For video reels it strips the audio and transcribes with Whisper. For image carousels it reads the text from each slide using a vision LLM. Both paths feed into the same detection and extraction pipeline.
 
 ---
 
 ## Requirements
 
 - Python 3.11+
-- ffmpeg (must be on your PATH)
+- ffmpeg (must be on your PATH — only needed for video reels)
 - An [OpenRouter](https://openrouter.ai) API key
 - Instagram cookies file (for authenticated downloads — see [Cookies](#cookies))
 
@@ -114,13 +114,20 @@ Dashboard available at `http://localhost:8501` (bind via SSH tunnel: `ssh -L 850
 
 ## How it works
 
-1. **Download** — `yt-dlp` fetches the reel or post (video or image) to a temp directory, using cookies for auth.
-2. **Caption** — Instagram's oEmbed API is queried for the post caption.
-3. **Audio extraction** — `ffmpeg` strips audio to a mono 16 kHz MP3. Skipped silently for static image posts.
+**Video reels:**
+1. **Download** — `yt-dlp` fetches the reel to a temp directory using cookies for auth.
+2. **Caption** — Post caption is extracted from yt-dlp metadata (oEmbed API as fallback).
+3. **Audio extraction** — `ffmpeg` strips audio to a mono 16 kHz MP3.
 4. **Transcription** — The audio is base64-encoded and sent to OpenRouter's Whisper Large V3 endpoint.
 5. **Detection** — Transcript + caption are classified as `recipe`, `movie`, `book`, or `place` by an LLM.
 6. **Extraction** — A type-specific prompt extracts a structured markdown summary.
 7. **Cleanup** — All temp files are deleted.
+
+**Image carousels:**
+1. **Download** — `yt-dlp` downloads each slide as an image to a temp directory.
+2. **Caption** — Post caption is extracted from yt-dlp metadata (oEmbed API as fallback).
+3. **Image reading** — All slides are base64-encoded and sent to Gemma 4 vision via OpenRouter, which extracts all visible text in one pass.
+4–7. Same detection, extraction, and cleanup as above.
 
 ---
 
@@ -128,24 +135,36 @@ Dashboard available at `http://localhost:8501` (bind via SSH tunnel: `ssh -L 850
 
 ```
 igparser/
-├── app.py            # Streamlit dashboard
-├── main.py           # CLI entrypoint (igrecipe command)
-├── downloader.py     # yt-dlp wrapper
-├── transcriber.py    # ffmpeg audio strip + OpenRouter Whisper call
-├── caption.py        # Instagram oEmbed caption fetch
-├── detector.py       # LLM content-type classifier
-├── content_extractor.py  # Type-specific LLM extraction prompts
+├── app.py               # Streamlit dashboard
+├── main.py              # CLI entrypoint (igrecipe command)
+├── downloader.py        # yt-dlp wrapper — returns (video_path, image_paths, caption)
+├── transcriber.py       # ffmpeg audio strip + OpenRouter Whisper (video reels)
+├── image_reader.py      # Gemma 4 vision — extracts text from carousel slides
+├── caption.py           # Instagram oEmbed caption fetch (fallback)
+├── detector.py          # LLM content-type classifier
+├── content_extractor.py # Type-specific LLM extraction prompts
 ├── Dockerfile
 ├── docker-compose.yml
-├── cookies/          # Place instagram.txt here (git-ignored)
+├── cookies/             # Place instagram.txt here (git-ignored)
 └── requirements.txt
 ```
+
+---
+
+## Models used (via OpenRouter)
+
+| Task | Model |
+|------|-------|
+| Audio transcription | `openai/whisper-large-v3` |
+| Carousel image reading | `google/gemma-4-31b-it` |
+| Content type detection | `google/gemma-4-31b-it` |
+| Content extraction | `google/gemma-4-31b-it` |
 
 ---
 
 ## Limitations
 
 - **Public posts only.** Private accounts, age-gated, and geo-restricted content will fail at download.
-- Static image posts rely on caption only — no audio to transcribe.
 - Whisper accuracy depends on audio clarity and background noise.
+- Carousel image reading accuracy depends on text legibility in the slides.
 - Instagram cookies expire periodically and will need refreshing.

@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 from downloader import download_reel
 from transcriber import extract_audio, transcribe_audio
+from image_reader import read_images
 from caption import fetch_caption
 from detector import detect_content_type, CONTENT_TYPES
 from content_extractor import extract_content
@@ -54,7 +55,7 @@ if generate and url.strip():
     with st.status("Working...", expanded=True) as status:
         try:
             st.write("Downloading post...")
-            video_path, yt_caption = download_reel(url.strip(), WORK_DIR)
+            video_path, image_paths, yt_caption = download_reel(url.strip(), WORK_DIR)
             st.write("Post downloaded.")
 
             st.write("Fetching caption...")
@@ -65,9 +66,17 @@ if generate and url.strip():
                 st.write("No caption found — continuing without it.")
 
             transcript = ""
-            if video_path is None:
-                st.write("Image-only post — using caption only.")
-            else:
+            if image_paths:
+                st.write(f"Carousel post ({len(image_paths)} slides) — reading image text...")
+                try:
+                    transcript = read_images(image_paths, openrouter_key)
+                    if transcript:
+                        st.write(f"Image text extracted ({len(transcript)} chars).")
+                    else:
+                        st.write("No text found in images.")
+                except RuntimeError as e:
+                    st.write(f"Image reading failed: {e}")
+            elif video_path is not None:
                 try:
                     st.write("Extracting audio...")
                     audio_path = extract_audio(video_path, WORK_DIR)

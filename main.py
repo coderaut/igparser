@@ -8,6 +8,7 @@ import os
 
 from downloader import download_reel
 from transcriber import extract_audio, transcribe_audio
+from image_reader import read_images
 from caption import fetch_caption
 from detector import detect_content_type
 from content_extractor import extract_content
@@ -52,7 +53,7 @@ def main(
     try:
         typer.echo("Downloading post...")
         try:
-            video_path, yt_caption = download_reel(url, work_dir)
+            video_path, image_paths, yt_caption = download_reel(url, work_dir)
         except RuntimeError as e:
             typer.echo(f"Error: {e}", err=True)
             raise typer.Exit(1)
@@ -65,9 +66,17 @@ def main(
             typer.echo("Warning: No caption found — continuing without it.", err=True)
 
         transcript = ""
-        if video_path is None:
-            typer.echo("Image-only post — using caption only.")
-        else:
+        if image_paths:
+            typer.echo(f"Carousel post ({len(image_paths)} slides) — reading image text...")
+            try:
+                transcript = read_images(image_paths, openrouter_key)
+                if transcript:
+                    typer.echo(f"Image text extracted ({len(transcript)} chars).")
+                else:
+                    typer.echo("Warning: No text found in images.", err=True)
+            except RuntimeError as e:
+                typer.echo(f"Image reading error: {e}", err=True)
+        elif video_path is not None:
             typer.echo("Extracting audio...")
             try:
                 audio_path = extract_audio(video_path, work_dir)

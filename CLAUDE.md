@@ -6,8 +6,8 @@ Supports four content types: recipes, movie/show recommendations, book recommend
 ## What it does
 
 Pipeline (in order):
-1. `downloader.py` — `yt-dlp` downloads the post to a temp dir, using `cookies/instagram.txt` for auth if present; returns `(video_path, image_paths, caption)`. For video reels: `image_paths=[]`. For image carousels: `video_path=None`, `image_paths=[slide_1.jpg, ...]`.
-2. `caption.py` — Instagram oEmbed API fallback for caption; only used if yt-dlp returned no description
+1. `downloader.py` — returns `(video_path, image_paths, caption)`. Video reels use `yt-dlp`; image carousels use `instaloader` (yt-dlp raises "No video formats found" at the extractor level for image posts and cannot be worked around). Both use `cookies/instagram.txt` for auth.
+2. `caption.py` — Instagram oEmbed API fallback for caption; only used if the downloader returned no description
 3a. `transcriber.py` — (video path) `ffmpeg` strips audio to mono 16 kHz MP3, then sends it base64-encoded to OpenRouter Whisper Large V3. Skipped for image carousels or videos with no audio track.
 3b. `image_reader.py` — (carousel path) Sends all slide images base64-encoded to Gemma 4 vision via OpenRouter to extract visible text. Used instead of transcription for image-only carousels.
 4. `detector.py` — LLM classifies the content as `recipe`, `movie`, `book`, or `place` using both caption and transcript
@@ -56,7 +56,7 @@ SSH tunnel to access: `ssh -L 8501:localhost:8501 root@<ip>`
 ```
 app.py            Streamlit UI — runs the full pipeline, no file output
 main.py           CLI entrypoint (Typer) — saves output/<slug>.md
-downloader.py     yt-dlp wrapper; reads COOKIES_FILE env var; returns (video_path, image_paths, caption)
+downloader.py     yt-dlp (video) / instaloader (image carousels); reads COOKIES_FILE env var; returns (video_path, image_paths, caption)
 transcriber.py    ffmpeg audio strip + OpenRouter Whisper call (video reels only)
 image_reader.py   base64-encodes carousel slides → Gemma 4 vision → extracted text (carousels only)
 caption.py        Instagram oEmbed fetch → fallback caption if yt-dlp returned nothing
@@ -88,8 +88,8 @@ To add a new content type: add an entry to `_PROMPTS` in `content_extractor.py`,
 ## Key constraints
 
 - Public posts only — private/age-gated/geo-restricted will fail at download
-- Static image posts: audio extraction is skipped, extraction relies on caption alone
-- If both transcript and caption are empty, the pipeline aborts
+- yt-dlp is used for video reels only; instaloader handles image carousels — do NOT try to use yt-dlp for image posts, it raises "No video formats found" unconditionally
+- If both transcript/image-text and caption are empty, the pipeline aborts
 - Cookies expire periodically — re-export from browser and replace the file, then `docker restart ig-parser`
 - Temp work dir: `/tmp/igrecipe` (CLI) or `tempfile.gettempdir()/igrecipe` (dashboard)
 

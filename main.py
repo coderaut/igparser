@@ -65,21 +65,24 @@ def main(
             typer.echo("Warning: No caption found — continuing without it.", err=True)
 
         transcript = ""
-        typer.echo("Extracting audio...")
-        try:
-            audio_path = extract_audio(video_path, work_dir)
-            typer.echo("Transcribing audio...")
+        if video_path is None:
+            typer.echo("Image-only post — using caption only.")
+        else:
+            typer.echo("Extracting audio...")
             try:
-                transcript = transcribe_audio(audio_path, openrouter_key, language=lang)
-                if transcript:
-                    typer.echo(f"Transcript obtained ({len(transcript)} chars).")
-                else:
-                    typer.echo("Warning: Transcript is empty.", err=True)
-            except RuntimeError as e:
-                typer.echo(f"Transcription error: {e}", err=True)
-                raise typer.Exit(1)
-        except (RuntimeError, FileNotFoundError):
-            typer.echo("No audio track found — using caption only.")
+                audio_path = extract_audio(video_path, work_dir)
+                typer.echo("Transcribing audio...")
+                try:
+                    transcript = transcribe_audio(audio_path, openrouter_key, language=lang)
+                    if transcript:
+                        typer.echo(f"Transcript obtained ({len(transcript)} chars).")
+                    else:
+                        typer.echo("Warning: Transcript is empty.", err=True)
+                except RuntimeError as e:
+                    typer.echo(f"Transcription error: {e}", err=True)
+                    raise typer.Exit(1)
+            except (RuntimeError, FileNotFoundError):
+                typer.echo("No audio track found — using caption only.")
 
         if not transcript and not caption:
             typer.echo(

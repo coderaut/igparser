@@ -65,23 +65,26 @@ if generate and url.strip():
                 st.write("No caption found — continuing without it.")
 
             transcript = ""
-            try:
-                st.write("Extracting audio...")
-                audio_path = extract_audio(video_path, WORK_DIR)
-                st.write("Audio extracted.")
+            if video_path is None:
+                st.write("Image-only post — using caption only.")
+            else:
                 try:
-                    st.write("Transcribing audio...")
-                    transcript = transcribe_audio(
-                        audio_path, openrouter_key, language=None
-                    )
-                    if transcript:
-                        st.write(f"Transcript obtained ({len(transcript)} chars).")
-                    else:
-                        st.write("Transcript is empty.")
-                except RuntimeError as e:
-                    st.write(f"Transcription failed: {e}")
-            except (RuntimeError, FileNotFoundError):
-                st.write("No audio track — using caption only.")
+                    st.write("Extracting audio...")
+                    audio_path = extract_audio(video_path, WORK_DIR)
+                    st.write("Audio extracted.")
+                    try:
+                        st.write("Transcribing audio...")
+                        transcript = transcribe_audio(
+                            audio_path, openrouter_key, language=None
+                        )
+                        if transcript:
+                            st.write(f"Transcript obtained ({len(transcript)} chars).")
+                        else:
+                            st.write("Transcript is empty.")
+                    except RuntimeError as e:
+                        st.write(f"Transcription failed: {e}")
+                except (RuntimeError, FileNotFoundError):
+                    st.write("No audio track — using caption only.")
 
             if not transcript and not caption:
                 raise ValueError("No caption or transcript available — cannot extract content.")

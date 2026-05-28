@@ -1,9 +1,12 @@
 import os
 from pathlib import Path
+
+import httpx
 import yt_dlp
 
 _COOKIES_FILE = os.getenv("COOKIES_FILE", "cookies.txt")
 _IMAGE_EXTS = {".jpg", ".jpeg", ".webp", ".png"}
+_IMG_HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.instagram.com/"}
 
 
 def download_reel(url: str, work_dir: Path) -> tuple[Path | None, list[Path], str]:
@@ -43,19 +46,55 @@ def download_reel(url: str, work_dir: Path) -> tuple[Path | None, list[Path], st
             raise RuntimeError(f"yt-dlp failed to download the reel: {e}") from e
 
     # --- image carousel path ---
-    img_opts = {
-        **base_opts,
-        "outtmpl": str(work_dir / "slide_%(autonumber)s.%(ext)s"),
-        "format": "best",
-    }
+    # yt-dlp raises "No video formats found" at the extractor level for image-only
+    # posts — no format selector can avoid it. Instead: extract metadata only
+    # (which works fine), parse out the image URLs, download them with httpx.
+    image_paths, caption = _download_carousel_images(url, work_dir, base_opts)
+    return None, image_paths, caption
+
+
+def _download_carousel_images(url: str, work_dir: Path, base_opts: dict) -> tuple[list[Path], str]:
     try:
-        with yt_dlp.YoutubeDL(img_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-        caption = _caption_from_info(info)
-        images = sorted(p for p in work_dir.iterdir() if p.suffix.lower() in _IMAGE_EXTS)
-        return None, images, caption
-    except yt_dlp.utils.DownloadError as e2:
-        raise RuntimeError(f"yt-dlp failed to download carousel images: {e2}") from e2
+        with yt_dlp.YoutubeDL({**base_opts, "skip_download": True}) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except yt_dlp.utils.DownloadError as e:
+        raise RuntimeError(f"yt-dlp failed to fetch post metadata: {e}") from e
+
+    caption = _caption_from_info(info)
+
+    # Carousel → entries list; single image → wrap info in list
+    entries = info.get("entries") or [info]
+    image_urls: list[str] = []
+    for entry in entries:
+        if not entry:
+            continue
+        img_url = _best_image_url(entry)
+        if img_url:
+            image_urls.append(img_url)
+
+    # Last resort: top-level thumbnail
+    if not image_urls and info.get("thumbnail"):
+        image_urls = [info["thumbnail"]]
+
+    image_paths: list[Path] = []
+    for i, img_url in enumerate(image_urls):
+        img_path = work_dir / f"slide_{i + 1:02d}.jpg"
+        try:
+            r = httpx.get(img_url, headers=_IMG_HEADERS, follow_redirects=True, timeout=30)
+            r.raise_for_status()
+            img_path.write_bytes(r.content)
+            image_paths.append(img_path)
+        except Exception:
+            continue
+
+    return image_paths, caption
+
+
+def _best_image_url(entry: dict) -> str | None:
+    for fmt in entry.get("formats") or []:
+        if fmt.get("ext") in ("jpg", "jpeg", "webp", "png"):
+            return fmt.get("url")
+    return entry.get("url") or entry.get("thumbnail")
 
 
 def _caption_from_info(info: dict) -> str:

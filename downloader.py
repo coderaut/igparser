@@ -1,11 +1,13 @@
+import http.cookiejar
 import os
+import re
 from pathlib import Path
 
 import httpx
+import instaloader
 import yt_dlp
 
 _COOKIES_FILE = os.getenv("COOKIES_FILE", "cookies.txt")
-_IMAGE_EXTS = {".jpg", ".jpeg", ".webp", ".png"}
 _IMG_HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.instagram.com/"}
 
 
@@ -23,7 +25,7 @@ def download_reel(url: str, work_dir: Path) -> tuple[Path | None, list[Path], st
     if cookies.exists():
         base_opts["cookiefile"] = str(cookies)
 
-    # --- video path ---
+    # --- video path (yt-dlp handles reels fine) ---
     video_opts = {
         **base_opts,
         "outtmpl": str(work_dir / "reel.%(ext)s"),
@@ -45,36 +47,45 @@ def download_reel(url: str, work_dir: Path) -> tuple[Path | None, list[Path], st
         if "No video formats found" not in str(e):
             raise RuntimeError(f"yt-dlp failed to download the reel: {e}") from e
 
-    # --- image carousel path ---
-    # yt-dlp raises "No video formats found" at the extractor level for image-only
-    # posts — no format selector can avoid it. Instead: extract metadata only
-    # (which works fine), parse out the image URLs, download them with httpx.
-    image_paths, caption = _download_carousel_images(url, work_dir, base_opts)
+    # --- image carousel path (instaloader handles images/carousels) ---
+    # yt-dlp raises "No video formats found" at the extractor level for image posts
+    # regardless of format selector or download=False — use instaloader instead.
+    image_paths, caption = _download_carousel_images(url, work_dir, cookies)
     return None, image_paths, caption
 
 
-def _download_carousel_images(url: str, work_dir: Path, base_opts: dict) -> tuple[list[Path], str]:
+def _download_carousel_images(url: str, work_dir: Path, cookies_path: Path) -> tuple[list[Path], str]:
+    shortcode = _extract_shortcode(url)
+
+    L = instaloader.Instaloader(quiet=True, sleep=False,
+                                 download_pictures=False, download_videos=False,
+                                 download_video_thumbnails=False, download_geotags=False,
+                                 download_comments=False, save_metadata=False)
+
+    if cookies_path.exists():
+        jar = http.cookiejar.MozillaCookieJar()
+        jar.load(str(cookies_path), ignore_discard=True, ignore_expires=True)
+        L.context._session.cookies.update({c.name: c.value for c in jar})
+
     try:
-        with yt_dlp.YoutubeDL({**base_opts, "skip_download": True}) as ydl:
-            info = ydl.extract_info(url, download=False)
-    except yt_dlp.utils.DownloadError as e:
-        raise RuntimeError(f"yt-dlp failed to fetch post metadata: {e}") from e
+        post = instaloader.Post.from_shortcode(L.context, shortcode)
+    except Exception as e:
+        raise RuntimeError(f"instaloader failed to fetch post {shortcode}: {e}") from e
 
-    caption = _caption_from_info(info)
+    caption = post.caption or ""
 
-    # Carousel → entries list; single image → wrap info in list
-    entries = info.get("entries") or [info]
     image_urls: list[str] = []
-    for entry in entries:
-        if not entry:
-            continue
-        img_url = _best_image_url(entry)
-        if img_url:
-            image_urls.append(img_url)
+    try:
+        nodes = list(post.get_sidecar_nodes())
+    except Exception:
+        nodes = []
 
-    # Last resort: top-level thumbnail
-    if not image_urls and info.get("thumbnail"):
-        image_urls = [info["thumbnail"]]
+    if nodes:
+        for node in nodes:
+            if not node.is_video:
+                image_urls.append(node.display_url)
+    elif not post.is_video:
+        image_urls.append(post.url)
 
     image_paths: list[Path] = []
     for i, img_url in enumerate(image_urls):
@@ -90,17 +101,8 @@ def _download_carousel_images(url: str, work_dir: Path, base_opts: dict) -> tupl
     return image_paths, caption
 
 
-def _best_image_url(entry: dict) -> str | None:
-    for fmt in entry.get("formats") or []:
-        if fmt.get("ext") in ("jpg", "jpeg", "webp", "png"):
-            return fmt.get("url")
-    return entry.get("url") or entry.get("thumbnail")
-
-
-def _caption_from_info(info: dict) -> str:
-    if info.get("description"):
-        return info["description"].strip()
-    for entry in (info.get("entries") or []):
-        if entry and entry.get("description"):
-            return entry["description"].strip()
-    return ""
+def _extract_shortcode(url: str) -> str:
+    m = re.search(r'/(?:p|reel)/([A-Za-z0-9_-]+)', url)
+    if not m:
+        raise ValueError(f"Cannot extract shortcode from Instagram URL: {url}")
+    return m.group(1)

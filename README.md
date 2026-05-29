@@ -2,7 +2,7 @@
 
 Downloads public Instagram Reels, static posts, and image carousels and extracts clean, structured markdown summaries.
 
-Supports four content types — **recipes, movies/shows, books, and places to visit** — auto-detected via LLM.
+Supports five content types — **recipes, movies/shows, books, places to visit, and games** — auto-detected via LLM.
 
 For video reels it strips the audio and transcribes with Whisper. For image carousels it reads the text from each slide using a vision LLM. Both paths feed into the same detection and extraction pipeline.
 
@@ -88,6 +88,7 @@ igrecipe <url> --type recipe
 igrecipe <url> --type movie
 igrecipe <url> --type book
 igrecipe <url> --type place
+igrecipe <url> --type game
 
 # Save to a custom output directory
 igrecipe <url> --output ~/notes
@@ -119,7 +120,7 @@ Dashboard available at `http://localhost:8501` (bind via SSH tunnel: `ssh -L 850
 2. **Caption** — Post caption is extracted from yt-dlp metadata (oEmbed API as fallback).
 3. **Audio extraction** — `ffmpeg` strips audio to a mono 16 kHz MP3.
 4. **Transcription** — The audio is base64-encoded and sent to OpenRouter's Whisper Large V3 endpoint.
-5. **Detection** — Transcript + caption are classified as `recipe`, `movie`, `book`, or `place` by an LLM.
+5. **Detection** — Transcript + caption are classified as `recipe`, `movie`, `book`, `place`, or `game` by an LLM.
 6. **Extraction** — A type-specific prompt extracts a structured markdown summary.
 7. **Cleanup** — All temp files are deleted.
 

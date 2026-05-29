@@ -1,7 +1,7 @@
 # ig parser
 
 Downloads public Instagram Reels and static posts and extracts structured markdown summaries.
-Supports four content types: recipes, movie/show recommendations, book recommendations, and places to visit — auto-detected via LLM.
+Supports five content types: recipes, movie/show recommendations, book recommendations, places to visit, and game recommendations — auto-detected via LLM.
 
 ## What it does
 
@@ -10,7 +10,7 @@ Pipeline (in order):
 2. `caption.py` — Instagram oEmbed API fallback for caption; only used if the downloader returned no description
 3a. `transcriber.py` — (video path) `ffmpeg` strips audio to mono 16 kHz MP3, then sends it base64-encoded to OpenRouter Whisper Large V3. Skipped for image carousels or videos with no audio track.
 3b. `image_reader.py` — (carousel path) Sends all slide images base64-encoded to Gemma 4 vision via OpenRouter to extract visible text. Used instead of transcription for image-only carousels.
-4. `detector.py` — LLM classifies the content as `recipe`, `movie`, `book`, or `place` using both caption and transcript
+4. `detector.py` — LLM classifies the content as `recipe`, `movie`, `book`, `place`, or `game` using both caption and transcript
 5. `content_extractor.py` — Type-specific prompt sent to LLM via OpenRouter using both caption and transcript; returns structured markdown
 6. Cleanup — temp files deleted; CLI saves to `output/<slug>.md`, dashboard is in-memory only
 
@@ -19,7 +19,7 @@ Pipeline (in order):
 | Mode | Command |
 |------|---------|
 | Streamlit dashboard | `streamlit run app.py` → `http://localhost:8501` |
-| CLI | `igrecipe <url> [--type auto|recipe|movie|book|place] [--output dir]` |
+| CLI | `igrecipe <url> [--type auto|recipe|movie|book|place|game] [--output dir]` |
 
 CLI is registered via `pyproject.toml` as `igrecipe = "main:app"`.
 
@@ -60,7 +60,7 @@ downloader.py     yt-dlp (video) / instaloader (image carousels); reads COOKIES_
 transcriber.py    ffmpeg audio strip + OpenRouter Whisper call (video reels only)
 image_reader.py   base64-encodes carousel slides → Gemma 4 vision → extracted text (carousels only)
 caption.py        Instagram oEmbed fetch → fallback caption if yt-dlp returned nothing
-detector.py       LLM classifier → returns one of: recipe, movie, book, place
+detector.py       LLM classifier → returns one of: recipe, movie, book, place, game
 content_extractor.py  Type-specific LLM prompts → returns (markdown, slug)
 pyproject.toml    Package config; CLI script registered here
 cookies/          Place instagram.txt here — git-ignored, Docker-mounted
@@ -82,6 +82,7 @@ To swap models, change the constants at the top of each file.
 | movie | Director/Genre/Where to watch, Why Watch It, What to Expect, Notes |
 | book | Author/Genre, What It's About, Why Read It, Notes |
 | place | Location/Type, Why Visit, Tips, Notes |
+| game | Type/Platform/Players, Why Play It, What to Expect, Notes |
 
 To add a new content type: add an entry to `_PROMPTS` in `content_extractor.py`, add it to `CONTENT_TYPES` in `detector.py`, and update the classifier system prompt.
 

@@ -24,6 +24,7 @@ TYPE_LABELS = {
     "movie": "Movie / Show",
     "book": "Book",
     "place": "Place to Visit",
+    "game": "Game",
 }
 
 st.set_page_config(page_title="ig parser", layout="centered")

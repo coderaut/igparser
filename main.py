@@ -27,6 +27,7 @@ class ContentType(str, Enum):
     movie = "movie"
     book = "book"
     place = "place"
+    game = "game"
 
 
 @app.command()
@@ -39,7 +40,7 @@ def main(
         None, "--lang", "-l", help="Optional language hint for Whisper (e.g. hi, ta, gu)"
     ),
     content_type: ContentType = typer.Option(
-        ContentType.auto, "--type", "-t", help="Content type: auto, recipe, movie, book, place"
+        ContentType.auto, "--type", "-t", help="Content type: auto, recipe, movie, book, place, game"
     ),
 ) -> None:
     """Download a public Instagram Reel or post and extract a formatted markdown summary."""

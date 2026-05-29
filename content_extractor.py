@@ -87,6 +87,26 @@ Extract the recommendation and format it as markdown with this structure:
   - What to order / see / do (if mentioned)
 - ## Notes (reservations needed, price range, caveats)""",
     ),
+    "game": (
+        "You are a game recommendation assistant. Given a video transcript and/or Instagram caption "
+        "recommending a game (video game, board game, card game, social/party game, etc.), "
+        "extract a clean, structured recommendation card. Output only markdown, no preamble.",
+        """\
+CAPTION:
+{caption}
+
+TRANSCRIPT:
+{transcript}
+
+Extract the recommendation and format it as markdown with this structure:
+- Game title (H1)
+- **Type:** (video game / board game / card game / party game / etc.)
+- **Platform / Where to get it:** (if mentioned — console, PC, Steam, tabletop store, etc.)
+- **Players:** (solo / multiplayer / number of players, if mentioned)
+- ## Why Play It (the reviewer's reasons)
+- ## What to Expect (genre, tone, difficulty, play time if mentioned)
+- ## Notes (caveats, age rating, similar games mentioned, price if noted)""",
+    ),
 }
 
 

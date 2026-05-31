@@ -1,5 +1,4 @@
 import shutil
-from enum import Enum
 from pathlib import Path
 
 import typer
@@ -10,7 +9,6 @@ from downloader import download_reel
 from transcriber import extract_audio, transcribe_audio
 from image_reader import read_images
 from caption import fetch_caption
-from detector import detect_content_type
 from content_extractor import extract_content
 
 load_dotenv()
@@ -21,15 +19,6 @@ WORK_DIR = Path("/tmp/igrecipe")
 DEFAULT_OUTPUT_DIR = Path("output")
 
 
-class ContentType(str, Enum):
-    auto = "auto"
-    recipe = "recipe"
-    movie = "movie"
-    book = "book"
-    place = "place"
-    game = "game"
-
-
 @app.command()
 def main(
     url: str = typer.Argument(..., help="Instagram Reel or post URL"),
@@ -38,9 +27,6 @@ def main(
     ),
     lang: str | None = typer.Option(
         None, "--lang", "-l", help="Optional language hint for Whisper (e.g. hi, ta, gu)"
-    ),
-    content_type: ContentType = typer.Option(
-        ContentType.auto, "--type", "-t", help="Content type: auto, recipe, movie, book, place, game"
     ),
 ) -> None:
     """Download a public Instagram Reel or post and extract a formatted markdown summary."""
@@ -100,16 +86,9 @@ def main(
             )
             raise typer.Exit(1)
 
-        if content_type == ContentType.auto:
-            typer.echo("Detecting content type...")
-            resolved_type = detect_content_type(transcript, caption or "", openrouter_key)
-            typer.echo(f"Detected type: {resolved_type}")
-        else:
-            resolved_type = content_type.value
-
-        typer.echo(f"Extracting {resolved_type}...")
+        typer.echo("Formatting content...")
         try:
-            result_md, slug = extract_content(resolved_type, transcript, caption or "", openrouter_key)
+            result_md, slug = extract_content(transcript, caption or "", openrouter_key)
         except Exception as e:
             typer.echo(f"Error calling LLM API: {e}", err=True)
             raise typer.Exit(1)

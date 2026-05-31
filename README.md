@@ -1,10 +1,8 @@
 # ig parser
 
-Downloads public Instagram Reels, static posts, and image carousels and extracts clean, structured markdown summaries.
+Downloads public Instagram Reels, static posts, and image carousels and formats them as clean, structured markdown.
 
-Supports five content types — **recipes, movies/shows, books, places to visit, and games** — auto-detected via LLM.
-
-For video reels it strips the audio and transcribes with Whisper. For image carousels it reads the text from each slide using a vision LLM. Both paths feed into the same detection and extraction pipeline.
+All text is extracted first (caption, audio transcript, or image text), then a single LLM pass decides the best structure and formats the content — preserving everything without forcing it into predefined templates.
 
 ---
 
@@ -83,15 +81,12 @@ The summary prints to the terminal and is saved to `output/<title>.md`.
 ### CLI flags
 
 ```bash
-# Force a content type instead of auto-detecting
-igrecipe <url> --type recipe
-igrecipe <url> --type movie
-igrecipe <url> --type book
-igrecipe <url> --type place
-igrecipe <url> --type game
-
 # Save to a custom output directory
 igrecipe <url> --output ~/notes
+
+# Hint the transcription language (for non-English audio)
+igrecipe <url> --lang hi
+igrecipe <url> --lang ta
 ```
 
 ---
@@ -111,6 +106,8 @@ docker compose up -d
 
 Dashboard available at `http://localhost:8501` (bind via SSH tunnel: `ssh -L 8501:localhost:8501 user@host`).
 
+Logs are written to `./logs/igrecipe.log` (rotating, 5 MB, 3 backups).
+
 ---
 
 ## How it works
@@ -120,15 +117,14 @@ Dashboard available at `http://localhost:8501` (bind via SSH tunnel: `ssh -L 850
 2. **Caption** — Post caption is extracted from yt-dlp metadata (oEmbed API as fallback).
 3. **Audio extraction** — `ffmpeg` strips audio to a mono 16 kHz MP3.
 4. **Transcription** — The audio is base64-encoded and sent to OpenRouter's Whisper Large V3 endpoint.
-5. **Detection** — Transcript + caption are classified as `recipe`, `movie`, `book`, `place`, or `game` by an LLM.
-6. **Extraction** — A type-specific prompt extracts a structured markdown summary.
-7. **Cleanup** — All temp files are deleted.
+5. **Formatting** — Caption + transcript are sent to an LLM, which chooses the appropriate structure and formats everything as markdown.
+6. **Cleanup** — All temp files are deleted.
 
 **Image carousels:**
-1. **Download** — `yt-dlp` downloads each slide as an image to a temp directory.
-2. **Caption** — Post caption is extracted from yt-dlp metadata (oEmbed API as fallback).
+1. **Download** — `instaloader` fetches each slide image to a temp directory.
+2. **Caption** — Post caption is extracted (oEmbed API as fallback).
 3. **Image reading** — All slides are base64-encoded and sent to Gemma 4 vision via OpenRouter, which extracts all visible text in one pass.
-4–7. Same detection, extraction, and cleanup as above.
+4–6. Same formatting and cleanup as above.
 
 ---
 
@@ -138,16 +134,16 @@ Dashboard available at `http://localhost:8501` (bind via SSH tunnel: `ssh -L 850
 igparser/
 ├── app.py               # Streamlit dashboard
 ├── main.py              # CLI entrypoint (igrecipe command)
-├── downloader.py        # yt-dlp wrapper — returns (video_path, image_paths, caption)
+├── downloader.py        # yt-dlp (video) / instaloader (carousels) — returns (video_path, image_paths, caption)
 ├── transcriber.py       # ffmpeg audio strip + OpenRouter Whisper (video reels)
 ├── image_reader.py      # Gemma 4 vision — extracts text from carousel slides
 ├── caption.py           # Instagram oEmbed caption fetch (fallback)
-├── detector.py          # LLM content-type classifier
-├── content_extractor.py # Type-specific LLM extraction prompts
+├── content_extractor.py # Free-form LLM formatting — preserves all content, chooses structure
+├── logger.py            # Rotating file logger → logs/igrecipe.log
 ├── Dockerfile
 ├── docker-compose.yml
 ├── cookies/             # Place instagram.txt here (git-ignored)
-└── requirements.txt
+└── logs/                # Log output (git-ignored)
 ```
 
 ---
@@ -158,8 +154,7 @@ igparser/
 |------|-------|
 | Audio transcription | `openai/whisper-large-v3` |
 | Carousel image reading | `google/gemma-4-31b-it` |
-| Content type detection | `google/gemma-4-31b-it` |
-| Content extraction | `google/gemma-4-31b-it` |
+| Content formatting | `google/gemma-4-31b-it` |
 
 ---
 

@@ -9,7 +9,7 @@ import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
 from downloader import download_reel
-from transcriber import extract_audio, transcribe_audio
+from transcriber import extract_audio, transcribe_audio, extract_frames
 from image_reader import read_images
 from caption import fetch_caption
 from content_extractor import extract_content
@@ -111,8 +111,32 @@ if generate and url.strip():
                         st.write(f"Transcription failed: {e}")
                         log.error("transcription failed: %s", e)
                 except (RuntimeError, FileNotFoundError):
-                    st.write("No audio track — using caption only.")
-                    log.info("no audio track in video, using caption only")
+                    st.write("No audio track — trying frame extraction...")
+                    log.info("no audio track in video, falling back to frame extraction")
+
+            if not transcript and video_path is not None:
+                try:
+                    frames = extract_frames(video_path, WORK_DIR)
+                    if frames:
+                        st.write(f"Extracted {len(frames)} frames — reading text...")
+                        log.debug("frame extraction: %d frames", len(frames))
+                        try:
+                            transcript = read_images(frames, openrouter_key)
+                            if transcript:
+                                st.write(f"Frame text extracted ({len(transcript)} chars).")
+                                log.debug("frame text: %d chars", len(transcript))
+                            else:
+                                st.write("No text found in frames.")
+                                log.warning("frame reader returned empty text")
+                        except RuntimeError as e:
+                            st.write(f"Frame reading failed: {e}")
+                            log.error("frame reading failed: %s", e)
+                    else:
+                        st.write("No scene changes detected — using caption only.")
+                        log.info("no scene changes detected in video")
+                except RuntimeError as e:
+                    st.write(f"Frame extraction failed: {e}")
+                    log.error("frame extraction failed: %s", e)
 
             if not transcript and not caption:
                 raise ValueError("No caption or transcript available — cannot extract content.")

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import os
 
 from downloader import download_reel
-from transcriber import extract_audio, transcribe_audio
+from transcriber import extract_audio, transcribe_audio, extract_frames
 from image_reader import read_images
 from caption import fetch_caption
 from content_extractor import extract_content
@@ -77,7 +77,25 @@ def main(
                 except RuntimeError as e:
                     typer.echo(f"Warning: Transcription failed — using caption only. ({e})", err=True)
             except (RuntimeError, FileNotFoundError):
-                typer.echo("No audio track found — using caption only.")
+                typer.echo("No audio track — trying frame extraction...")
+
+        if not transcript and video_path is not None:
+            try:
+                frames = extract_frames(video_path, work_dir)
+                if frames:
+                    typer.echo(f"Extracted {len(frames)} frames — reading text...")
+                    try:
+                        transcript = read_images(frames, openrouter_key)
+                        if transcript:
+                            typer.echo(f"Frame text extracted ({len(transcript)} chars).")
+                        else:
+                            typer.echo("Warning: No text found in frames.", err=True)
+                    except RuntimeError as e:
+                        typer.echo(f"Frame reading failed: {e}", err=True)
+                else:
+                    typer.echo("No scene changes detected — using caption only.")
+            except RuntimeError as e:
+                typer.echo(f"Frame extraction failed: {e}", err=True)
 
         if not transcript and not caption:
             typer.echo(

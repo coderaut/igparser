@@ -9,6 +9,8 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - COOKIES_FILE=/cookies/instagram.txt
       - LOG_DIR=/logs
+      - IG_USERNAME=${IG_USERNAME:-}
+      - IG_PASSWORD=${IG_PASSWORD:-}
     volumes:
       - ./cookies:/cookies
       - ./logs:/logs

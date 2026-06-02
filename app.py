@@ -18,11 +18,30 @@ from logger import log
 load_dotenv()
 
 WORK_DIR = Path(tempfile.gettempdir()) / "igrecipe"
+COOKIES_PATH = Path(os.getenv("COOKIES_FILE", "cookies/instagram.txt"))
 
 st.set_page_config(page_title="ig parser", layout="centered")
 
 st.title("ig parser")
 st.caption("Paste a public Instagram Reel or post URL to extract a clean summary.")
+
+with st.sidebar:
+    st.header("Cookies")
+    if COOKIES_PATH.exists():
+        mtime = COOKIES_PATH.stat().st_mtime
+        import datetime
+        age = datetime.datetime.now() - datetime.datetime.fromtimestamp(mtime)
+        days = age.days
+        color = "green" if days < 60 else "orange" if days < 90 else "red"
+        st.markdown(f"Last updated: :{color}[{days}d ago]")
+    else:
+        st.markdown(":red[No cookies file found]")
+    uploaded = st.file_uploader("Upload instagram.txt", type="txt", label_visibility="collapsed")
+    if uploaded is not None:
+        COOKIES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        COOKIES_PATH.write_bytes(uploaded.getvalue())
+        log.info("cookies updated via UI upload (%d bytes)", len(uploaded.getvalue()))
+        st.success("Cookies updated.")
 
 url = st.text_input(
     "Instagram URL",

@@ -75,8 +75,7 @@ def main(
                     else:
                         typer.echo("Warning: Transcript is empty.", err=True)
                 except RuntimeError as e:
-                    typer.echo(f"Transcription error: {e}", err=True)
-                    raise typer.Exit(1)
+                    typer.echo(f"Warning: Transcription failed — using caption only. ({e})", err=True)
             except (RuntimeError, FileNotFoundError):
                 typer.echo("No audio track found — using caption only.")
 

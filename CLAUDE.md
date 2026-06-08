@@ -61,15 +61,13 @@ Logs write to `./logs/igrecipe.log` (rotating, 5 MB max, 3 backups). Docker moun
 
 ## Docker deployment (Heimdall)
 
-Port `0.0.0.0:8501` — accessible directly over Tailscale.
+Port bound `127.0.0.1:8501` — loopback only, NOT exposed publicly. `0.0.0.0` would bind all interfaces (including the public IP), not just Tailscale — a real exposure caught and fixed 2026-06-08. Reached externally via `ig.heim-dall.com` through Caddy on the Tailscale interface; see [[feedback-tailscale-port-binding]].
 `./cookies` mounted as writable volume at `/cookies`.
 `./logs` mounted at `/logs`.
 
 ```bash
 docker compose up -d --build
 ```
-
-SSH tunnel to access: `ssh -L 8501:localhost:8501 root@<ip>`
 
 ## File map
 

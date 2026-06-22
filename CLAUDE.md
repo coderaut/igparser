@@ -64,10 +64,15 @@ Logs write to `./logs/igrecipe.log` (rotating, 5 MB max, 3 backups). Docker moun
 Port bound `127.0.0.1:8501` — loopback only, NOT exposed publicly. `0.0.0.0` would bind all interfaces (including the public IP), not just Tailscale — a real exposure caught and fixed 2026-06-08. Reached externally via `ig.heim-dall.com` through Caddy on the Tailscale interface; see [[feedback-tailscale-port-binding]].
 `./cookies` mounted as writable volume at `/cookies`.
 `./logs` mounted at `/logs`.
+`./output` mounted at `/output` (added 2026-06-22) — lets the host read CLI results written inside the container. Used by the Hermes `ig-save` skill (see below). git-ignored.
 
 ```bash
 docker compose up -d --build
 ```
+
+## Hermes ig-save integration
+
+The Hermes agent has an `ig-save` skill (`/root/.hermes/skills/social-media/ig-save/`) that turns a shared Instagram link into an Obsidian capture note. It runs the CLI **inside this container** (`docker exec ig-parser python main.py "<url>" -o /output`) because the Heimdall host lacks the deps (no `faster_whisper`). The markdown lands in `/output` (= host `./output`), then Hermes prepends capture frontmatter and moves it to `/root/Obsidian/Valhalla/Captures/`. The skill also installs fresh cookies sent over Telegram (`ig_cookies_update.sh`) — no container restart needed, yt-dlp re-reads the jar per request.
 
 ## File map
 
@@ -100,8 +105,9 @@ To swap models, change the constants at the top of each file.
 - yt-dlp is used for video reels only; instaloader handles image carousels — do NOT try to use yt-dlp for image posts
 - yt-dlp sometimes returns `ext=mp4` with a title but writes no file to disk (happens with some carousel posts where a stub video entry exists in the metadata). When `work_dir` is empty after a claimed successful download, the code falls through to instaloader instead of raising. This is handled in `downloader.py`.
 - If both transcript/image-text and caption are empty, the pipeline aborts
-- Cookies expire periodically (~90 days) — upload a fresh `instagram.txt` via the Streamlit sidebar
+- Cookies expire periodically (~90 days) — upload a fresh `instagram.txt` via the Streamlit sidebar, or send it to Hermes (`ig-save` skill installs it)
 - Credential login is blocked on VPS/datacenter IPs — browser cookie export is required in those environments
+- **Account-lock gotcha (2026-06-22):** cookies minted on a home/residential IP then replayed from Heimdall's datacenter IP (148.230.67.58) look like a stolen session → IG flags/locks the account ("impossible travel"). Fix: mint the session **from Heimdall's IP** — log in with the device routed through Heimdall's Tailscale exit node (the ig-parser container egresses the same 148.230.67.58), complete IG's "trust this device" prompt, then export those cookies. Still a datacenter IP so expect occasional checkpoints; keep download volume human-paced. Full plan: `/root/Sync/Reports/2026-06-22-ig-save-trusted-machine-cookies.md`. Planned mitigation: an `IG_USER_AGENT` env threaded through yt-dlp/instaloader/httpx so requests match the trusted browser.
 - Frame extraction fallback (scene detection) works well for hard-cut slideshow reels but misses visually similar slides (same design template across slides = low scene change scores below threshold)
 - Whisper returns 400 if the extracted audio file is too small (empty audio track) — `transcriber.py` checks for this and raises a clean error before sending
 - Temp work dir: `/tmp/igrecipe` (CLI) or `tempfile.gettempdir()/igrecipe` (dashboard)

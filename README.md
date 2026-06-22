@@ -106,6 +106,8 @@ docker compose up -d
 
 Dashboard available at `http://localhost:8501` (bind via SSH tunnel: `ssh -L 8501:localhost:8501 user@host`).
 
+The compose file also mounts `./output` at `/output` so CLI runs inside the container (`docker exec ig-parser igrecipe <url> -o /output`) write results back to the host — used by the Hermes `ig-save` skill on Heimdall.
+
 Logs are written to `./logs/igrecipe.log` (rotating, 5 MB, 3 backups).
 
 ---
@@ -143,6 +145,7 @@ igparser/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── cookies/             # Place instagram.txt here (git-ignored)
+├── output/              # CLI markdown output, host-readable mount (git-ignored)
 └── logs/                # Log output (git-ignored)
 ```
 
@@ -164,3 +167,4 @@ igparser/
 - Whisper accuracy depends on audio clarity and background noise.
 - Carousel image reading accuracy depends on text legibility in the slides.
 - Instagram cookies expire periodically and will need refreshing.
+- **Datacenter-IP risk:** replaying browser cookies from a VPS can get the account flagged/locked ("impossible travel"). When self-hosting, mint the session from the server's IP (e.g. log in via a Tailscale exit node on that host) and keep download volume human-paced.

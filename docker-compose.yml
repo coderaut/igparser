@@ -7,14 +7,8 @@ services:
       - "127.0.0.1:8501:8501"
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - COOKIES_FILE=/cookies/instagram.txt
+      - APIFY_TOKEN=${APIFY_TOKEN}
       - LOG_DIR=/logs
-      - IG_USERNAME=${IG_USERNAME:-}
-      - IG_PASSWORD=${IG_PASSWORD:-}
     volumes:
-      # Single source of truth: cookie-mint writes /root/cookie-vault/instagram.txt.
-      # Read-only so ig-parser/yt-dlp never clobber the freshly-minted session
-      # (yt-dlp's end-of-run cookie write-back becomes a harmless warning).
-      - /root/cookie-vault:/cookies:ro
       - ./logs:/logs
       - ./output:/output

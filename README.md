@@ -11,7 +11,7 @@ All text is extracted first (caption, audio transcript, or image text), then a s
 - Python 3.11+
 - ffmpeg (must be on your PATH — only needed for video reels)
 - An [OpenRouter](https://openrouter.ai) API key
-- Instagram cookies file (for authenticated downloads — see [Cookies](#cookies))
+- An [Apify](https://apify.com) API token (`APIFY_TOKEN`) for Instagram retrieval
 
 ### Installing ffmpeg
 
@@ -39,24 +39,20 @@ source .venv/bin/activate        # macOS/Linux
 # 3. Install dependencies
 pip install -e .
 
-# 4. Configure your API key
+# 4. Configure your API keys
 cp .env.example .env
-# Edit .env and add your key:
+# Edit .env and add your keys:
 #   OPENROUTER_API_KEY=sk-or-...
+#   APIFY_TOKEN=apify_api_...
 ```
 
 ---
 
-## Cookies
+## Retrieval
 
-Instagram requires authentication for downloads. Export your cookies from a logged-in browser session and save them as `cookies/instagram.txt`.
+Instagram media is retrieved via the **Apify Instagram Scraper** (`apify/instagram-scraper`). No cookies, no browser sessions, no yt-dlp/instaloader — just set `APIFY_TOKEN` in `.env` (see `.env.example`) and the scraper handles auth and anti-bot layers.
 
-1. Install the **Get cookies.txt LOCALLY** extension (Chrome/Firefox)
-2. Log into Instagram in your browser
-3. Click the extension and export cookies for `instagram.com`
-4. Save the file to `cookies/instagram.txt`
-
-yt-dlp will pick this up automatically.
+Private, deleted, and age-restricted posts return an empty dataset and fail with a clear error message — this is deliberate.
 
 ---
 
@@ -94,13 +90,11 @@ igrecipe <url> --lang ta
 ## Docker (Heimdall / self-hosted)
 
 ```bash
-# 1. Add your API key
-echo "OPENROUTER_API_KEY=sk-or-..." > .env
+# 1. Add your API keys
+cp .env.example .env
+# Edit .env: set OPENROUTER_API_KEY and APIFY_TOKEN
 
-# 2. Add your Instagram cookies
-cp /path/to/instagram.txt cookies/instagram.txt
-
-# 3. Start
+# 2. Start
 docker compose up -d
 ```
 
@@ -115,16 +109,16 @@ Logs are written to `./logs/igrecipe.log` (rotating, 5 MB, 3 backups).
 ## How it works
 
 **Video reels:**
-1. **Download** — `yt-dlp` fetches the reel to a temp directory using cookies for auth.
-2. **Caption** — Post caption is extracted from yt-dlp metadata (oEmbed API as fallback).
+1. **Retrieval** — `fetcher.py` calls the Apify Instagram Scraper with the post URL and downloads the public CDN video to a temp directory. No cookies.
+2. **Caption** — Post caption is returned by Apify (oEmbed API as fallback).
 3. **Audio extraction** — `ffmpeg` strips audio to a mono 16 kHz MP3.
 4. **Transcription** — The audio is base64-encoded and sent to OpenRouter's Whisper Large V3 endpoint.
 5. **Formatting** — Caption + transcript are sent to an LLM, which chooses the appropriate structure and formats everything as markdown.
 6. **Cleanup** — All temp files are deleted.
 
 **Image carousels:**
-1. **Download** — `instaloader` fetches each slide image to a temp directory.
-2. **Caption** — Post caption is extracted (oEmbed API as fallback).
+1. **Retrieval** — `fetcher.py` calls the Apify Instagram Scraper and downloads each slide image from the public CDN. No cookies.
+2. **Caption** — Post caption is returned by Apify (oEmbed API as fallback).
 3. **Image reading** — All slides are base64-encoded and sent to Gemma 4 vision via OpenRouter, which extracts all visible text in one pass.
 4–6. Same formatting and cleanup as above.
 
@@ -136,15 +130,15 @@ Logs are written to `./logs/igrecipe.log` (rotating, 5 MB, 3 backups).
 igparser/
 ├── app.py               # Streamlit dashboard
 ├── main.py              # CLI entrypoint (igrecipe command)
-├── downloader.py        # yt-dlp (video) / instaloader (carousels) — returns (video_path, image_paths, caption)
+├── fetcher.py           # Apify Instagram Scraper fetch → downloads media → (video_path, image_paths, caption, meta)
 ├── transcriber.py       # ffmpeg audio strip + OpenRouter Whisper (video reels)
 ├── image_reader.py      # Gemma 4 vision — extracts text from carousel slides
 ├── caption.py           # Instagram oEmbed caption fetch (fallback)
 ├── content_extractor.py # Free-form LLM formatting — preserves all content, chooses structure
 ├── logger.py            # Rotating file logger → logs/igrecipe.log
+├── legacy/              # Archived: downloader.py, detector.py (old yt-dlp/instaloader path)
 ├── Dockerfile
 ├── docker-compose.yml
-├── cookies/             # Place instagram.txt here (git-ignored)
 ├── output/              # CLI markdown output, host-readable mount (git-ignored)
 └── logs/                # Log output (git-ignored)
 ```
@@ -163,8 +157,7 @@ igparser/
 
 ## Limitations
 
-- **Public posts only.** Private accounts, age-gated, and geo-restricted content will fail at download.
+- **Public posts only.** Private, deleted, and age-gated content returns an empty Apify dataset — the app fails with a clear "forward a screenshot instead" message.
 - Whisper accuracy depends on audio clarity and background noise.
 - Carousel image reading accuracy depends on text legibility in the slides.
-- Instagram cookies expire periodically and will need refreshing.
-- **Datacenter-IP risk:** replaying browser cookies from a VPS can get the account flagged/locked ("impossible travel"). When self-hosting, mint the session from the server's IP (e.g. log in via a Tailscale exit node on that host) and keep download volume human-paced.
+- Apify rate limits and occasional scraper outages can cause transient failures. A fallback provider can be wired behind `fetch_post()` if needed.

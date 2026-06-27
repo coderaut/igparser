@@ -5,7 +5,9 @@ __pycache__/
 *.pyo
 output/
 logs/
-cookies/*.txt
 *.egg-info/
 dist/
 build/
+
+# Obsolete cookie store (retrieval is Apify-based now) — never commit leftover session files
+cookies/

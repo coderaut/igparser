@@ -1,0 +1,12 @@
+[
+  {
+    "type": "Image",
+    "shortCode": "IMG789ghi",
+    "caption": "A single photo",
+    "url": "https://www.instagram.com/p/IMG789ghi/",
+    "displayUrl": "https://cdn.example.com/single.jpg",
+    "ownerUsername": "photog",
+    "ownerFullName": "Photo Grapher",
+    "timestamp": "2026-06-15T12:00:00.000Z"
+  }
+]

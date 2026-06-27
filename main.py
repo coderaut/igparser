@@ -5,7 +5,7 @@ import typer
 from dotenv import load_dotenv
 import os
 
-from downloader import download_reel
+from fetcher import fetch_post, inject_source_line
 from transcriber import extract_audio, transcribe_audio, extract_frames
 from image_reader import read_images
 from caption import fetch_caption
@@ -40,7 +40,7 @@ def main(
     try:
         typer.echo("Downloading post...")
         try:
-            video_path, image_paths, yt_caption = download_reel(url, work_dir)
+            video_path, image_paths, yt_caption, meta = fetch_post(url, work_dir)
         except RuntimeError as e:
             typer.echo(f"Error: {e}", err=True)
             raise typer.Exit(1)
@@ -109,6 +109,8 @@ def main(
         except Exception as e:
             typer.echo(f"Error calling LLM API: {e}", err=True)
             raise typer.Exit(1)
+
+        result_md = inject_source_line(result_md, meta)
 
         output.mkdir(parents=True, exist_ok=True)
         out_file = output / f"{slug}.md"

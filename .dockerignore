@@ -1,7 +1,11 @@
-.venv
-__pycache__
+.git/
+.venv/
+legacy/
+tests/
+.superpowers/
+docs/
+output/
+logs/
+__pycache__/
 *.pyc
 .env
-output/
-cookies/
-.git

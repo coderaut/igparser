@@ -39,6 +39,13 @@ Also requires `ffmpeg` on PATH (only needed for video reels).
 
 ## Cookies
 
+**Primary source (Heimdall): the cookie-mint vault.** As of 2026-06-27 the Docker deployment reads
+its cookie from `/root/cookie-vault/instagram.txt`, mounted **read-only** at `/cookies` (single source
+of truth — see the `cookie-mint` app/skill). `COOKIES_FILE=/cookies/instagram.txt` already points yt-dlp
+there. Refresh via the Hermes `cookie-mint` skill or `cookie-mint`'s `/session` flow. Credential login
+(`IG_USERNAME`/`IG_PASSWORD`) is **disabled** in `.env` because the vault is read-only and datacenter-IP
+login never worked anyway; the sections below describe the legacy/local auth paths.
+
 Instagram requires authenticated downloads. The app supports two auth paths — both use `cookies/instagram.txt` as the cookie store for yt-dlp.
 
 **Browser cookie export (always works):**

@@ -1,5 +1,13 @@
 # ig parser
 
+> **⏳ PENDING MIGRATION (2026-06-27) — read before changing the fetch path.** An
+> approved spec + implementation plan exist to replace the cookie/yt-dlp/instaloader
+> fetch path with the **Apify Instagram Scraper** (keeping all OCR/Whisper unchanged).
+> Work lives on branch `apify-fetch-backend`. Not yet implemented — `master` still
+> uses cookies. To implement: follow `docs/superpowers/plans/2026-06-27-ig-parser-apify-fetch.md`
+> via the superpowers `subagent-driven-development` skill (Sonnet subagents, main-model
+> review per task). Spec: `docs/superpowers/specs/2026-06-27-ig-parser-apify-fetch-design.md`.
+
 Downloads public Instagram Reels and static posts and formats them as clean markdown. All text is extracted first (caption + transcript or image text), then a single LLM pass chooses the appropriate structure and formats the content — no predefined type templates, nothing discarded.
 
 ## What it does

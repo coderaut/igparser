@@ -91,3 +91,74 @@ def test_inject_source_line_no_h1_prepends():
 def test_inject_source_line_empty_meta_noop():
     md = "# Title\n\nBody."
     assert fetcher.inject_source_line(md, {}) == md
+
+
+import httpx as _httpx
+
+
+class _FakeResp:
+    def __init__(self, json_data=None, content=b"", status_code=200):
+        self._json = json_data
+        self.content = content
+        self.status_code = status_code
+        self.text = ""
+
+    def json(self):
+        return self._json
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise _httpx.HTTPStatusError("err", request=None, response=self)
+
+
+def _patch_apify(monkeypatch, fixture_name):
+    """Make fetcher.httpx.post return the given fixture, and httpx.get write bytes."""
+    monkeypatch.setenv("APIFY_TOKEN", "test-token")
+    items = _load(fixture_name)
+
+    def fake_post(url, params=None, json=None, timeout=None):
+        assert "run-sync-get-dataset-items" in url
+        assert params["token"] == "test-token"
+        assert json["resultsLimit"] == 1
+        assert json["directUrls"]
+        return _FakeResp(json_data=items)
+
+    def fake_get(url, headers=None, follow_redirects=None, timeout=None):
+        return _FakeResp(content=b"BINARY")
+
+    monkeypatch.setattr(fetcher.httpx, "post", fake_post)
+    monkeypatch.setattr(fetcher.httpx, "get", fake_get)
+
+
+def test_fetch_post_video(monkeypatch, tmp_path):
+    _patch_apify(monkeypatch, "apify_video.json")
+    video, images, caption, meta = fetcher.fetch_post(
+        "https://www.instagram.com/reel/VID123abc/", tmp_path
+    )
+    assert video == tmp_path / "reel.mp4"
+    assert video.read_bytes() == b"BINARY"
+    assert images == []
+    assert caption == "My reel caption with #tags"
+    assert meta["author"] == "creator"
+
+
+def test_fetch_post_carousel(monkeypatch, tmp_path):
+    _patch_apify(monkeypatch, "apify_carousel.json")
+    video, images, caption, meta = fetcher.fetch_post(
+        "https://www.instagram.com/p/CAR456def/", tmp_path
+    )
+    assert video is None
+    assert images == [tmp_path / "slide_01.jpg", tmp_path / "slide_02.jpg"]
+    assert all(p.read_bytes() == b"BINARY" for p in images)
+
+
+def test_fetch_post_empty_dataset_raises(monkeypatch, tmp_path):
+    _patch_apify(monkeypatch, "apify_empty.json")
+    with pytest.raises(RuntimeError, match="not accessible"):
+        fetcher.fetch_post("https://www.instagram.com/p/GONE000/", tmp_path)
+
+
+def test_fetch_post_missing_token_raises(monkeypatch, tmp_path):
+    monkeypatch.delenv("APIFY_TOKEN", raising=False)
+    with pytest.raises(RuntimeError, match="APIFY_TOKEN"):
+        fetcher.fetch_post("https://www.instagram.com/p/ABC123/", tmp_path)

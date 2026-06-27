@@ -58,6 +58,79 @@ def _parse_item(item: dict) -> tuple[str | None, list[str], str, dict]:
     return None, image_urls, caption, meta
 
 
+def _download_media(url: str, dest: Path) -> Path:
+    r = httpx.get(url, headers=_IMG_HEADERS, follow_redirects=True, timeout=_REQUEST_TIMEOUT)
+    r.raise_for_status()
+    dest.write_bytes(r.content)
+    return dest
+
+
+def fetch_post(url: str, work_dir: Path) -> tuple[Path | None, list[Path], str, dict]:
+    """Fetch an Instagram post/reel/carousel via Apify and download its media.
+
+    Returns (video_path, image_paths, caption, meta):
+      - Video post:     (video_path, [], caption, meta)
+      - Image carousel: (None, [slide_01.jpg, ...], caption, meta)
+      - Single image:   (None, [slide_01.jpg], caption, meta)
+    Exactly one of video_path / image_paths is non-empty.
+    Raises RuntimeError on auth failure, inaccessible post, or total media failure.
+    """
+    log.info("fetch_post start: %s", url)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    _extract_shortcode(url)  # validate the URL is a post/reel before spending an Apify call
+
+    token = os.getenv("APIFY_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError("APIFY_TOKEN is not set — add it to .env")
+
+    payload = {
+        "directUrls": [url],
+        "resultsType": "posts",
+        "resultsLimit": 1,
+        "addParentData": False,
+    }
+    try:
+        resp = httpx.post(
+            APIFY_ENDPOINT, params={"token": token}, json=payload, timeout=_REQUEST_TIMEOUT
+        )
+        resp.raise_for_status()
+    except httpx.TimeoutException as e:
+        raise RuntimeError(f"Apify request timed out after {_REQUEST_TIMEOUT}s") from e
+    except httpx.HTTPStatusError as e:
+        code = getattr(e.response, "status_code", "?")
+        if code == 401:
+            raise RuntimeError("Apify rejected the token (401) — check APIFY_TOKEN") from e
+        body = getattr(e.response, "text", "") or ""
+        raise RuntimeError(f"Apify API error {code}: {body[:300]}") from e
+
+    items = resp.json()
+    if not items:
+        raise RuntimeError(
+            "post not accessible (private/deleted/age-restricted) — forward a screenshot instead"
+        )
+
+    video_url, image_urls, caption, meta = _parse_item(items[0])
+
+    if video_url:
+        video_path = _download_media(video_url, work_dir / "reel.mp4")
+        log.info("video downloaded: %d bytes", video_path.stat().st_size)
+        return video_path, [], caption, meta
+
+    image_paths: list[Path] = []
+    for i, img_url in enumerate(image_urls):
+        dest = work_dir / f"slide_{i + 1:02d}.jpg"
+        try:
+            image_paths.append(_download_media(img_url, dest))
+        except Exception as e:  # warn-and-continue per slide (legacy carousel semantics)
+            log.warning("slide %d download failed: %s", i + 1, e)
+
+    if not image_paths and not caption:
+        raise RuntimeError("Apify returned no downloadable media and no caption")
+
+    log.info("carousel done: %d/%d slides", len(image_paths), len(image_urls))
+    return None, image_paths, caption, meta
+
+
 def inject_source_line(markdown: str, meta: dict) -> str:
     """Insert a '> Source: …' blockquote immediately after the first H1.
 

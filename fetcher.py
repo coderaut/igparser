@@ -87,7 +87,7 @@ def fetch_post(url: str, work_dir: Path) -> tuple[Path | None, list[Path], str, 
         "directUrls": [url],
         "resultsType": "posts",
         "resultsLimit": 1,
-        "addParentData": False,
+        "addParentData": False,  # suppress Apify parent-post inflation on carousel children
     }
     try:
         resp = httpx.post(

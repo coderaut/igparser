@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import httpx as _httpx
 import pytest
 
 import fetcher
@@ -93,9 +94,6 @@ def test_inject_source_line_empty_meta_noop():
     assert fetcher.inject_source_line(md, {}) == md
 
 
-import httpx as _httpx
-
-
 class _FakeResp:
     def __init__(self, json_data=None, content=b"", status_code=200):
         self._json = json_data
@@ -108,7 +106,11 @@ class _FakeResp:
 
     def raise_for_status(self):
         if self.status_code >= 400:
-            raise _httpx.HTTPStatusError("err", request=None, response=self)
+            raise _httpx.HTTPStatusError(
+                "err",
+                request=_httpx.Request("POST", "https://example.com"),
+                response=self,
+            )
 
 
 def _patch_apify(monkeypatch, fixture_name):
@@ -161,4 +163,35 @@ def test_fetch_post_empty_dataset_raises(monkeypatch, tmp_path):
 def test_fetch_post_missing_token_raises(monkeypatch, tmp_path):
     monkeypatch.delenv("APIFY_TOKEN", raising=False)
     with pytest.raises(RuntimeError, match="APIFY_TOKEN"):
+        fetcher.fetch_post("https://www.instagram.com/p/ABC123/", tmp_path)
+
+
+def test_fetch_post_401_raises(monkeypatch, tmp_path):
+    monkeypatch.setenv("APIFY_TOKEN", "bad-token")
+    monkeypatch.setattr(fetcher.httpx, "post", lambda *a, **kw: _FakeResp(status_code=401))
+    with pytest.raises(RuntimeError, match="token"):
+        fetcher.fetch_post("https://www.instagram.com/p/ABC123/", tmp_path)
+
+
+def test_fetch_post_timeout_raises(monkeypatch, tmp_path):
+    monkeypatch.setenv("APIFY_TOKEN", "test-token")
+
+    def _raise_timeout(*a, **kw):
+        raise _httpx.TimeoutException("slow")
+
+    monkeypatch.setattr(fetcher.httpx, "post", _raise_timeout)
+    with pytest.raises(RuntimeError, match="timed out"):
+        fetcher.fetch_post("https://www.instagram.com/p/ABC123/", tmp_path)
+
+
+def test_fetch_post_http_error_raises(monkeypatch, tmp_path):
+    monkeypatch.setenv("APIFY_TOKEN", "test-token")
+
+    def _fake_post(*a, **kw):
+        r = _FakeResp(status_code=500)
+        r.text = "Internal Server Error"
+        return r
+
+    monkeypatch.setattr(fetcher.httpx, "post", _fake_post)
+    with pytest.raises(RuntimeError, match="Apify API error"):
         fetcher.fetch_post("https://www.instagram.com/p/ABC123/", tmp_path)

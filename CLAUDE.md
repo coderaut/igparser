@@ -70,7 +70,7 @@ docker compose up -d --build
 
 ## Hermes ig-save integration
 
-The Hermes agent has an `ig-save` skill (`/root/.hermes/skills/social-media/ig-save/`) that turns a shared Instagram link into an Obsidian capture note. It runs the CLI **inside this container** (`docker exec ig-parser python main.py "<url>" -o /output`) because the Heimdall host lacks the deps (no `faster_whisper`). The markdown lands in `/output` (= host `./output`), then Hermes prepends capture frontmatter and moves it to `/root/Obsidian/Valhalla/Captures/`. NOTE (2026-06-27): retrieval is now Apify-based, so the skill's old cookie-install step (`ig_cookies_update.sh`) is dead and can be removed in a later Hermes-side cleanup.
+The Hermes agent has an `ig-save` skill (`/root/.hermes/skills/social-media/ig-save/`) that turns a shared Instagram link into an Obsidian capture note. It runs the CLI **inside this container** (`docker exec ig-parser python main.py "<url>" -o /output`) because the Heimdall host lacks the deps (no `faster_whisper`). The markdown lands in `/output` (= host `./output`), then Hermes prepends capture frontmatter and moves it to `/root/Obsidian/Valhalla/Captures/`. NOTE (2026-06-27): retrieval is now Apify-based, so the skill's old cookie-install step (`ig_cookies_update.sh`) was removed from the Hermes ig-save skill (skill bumped to v1.1; cookie-refresh trigger dropped). The skill is now save-only.
 
 ## File map
 

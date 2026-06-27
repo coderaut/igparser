@@ -12,6 +12,9 @@ services:
       - IG_USERNAME=${IG_USERNAME:-}
       - IG_PASSWORD=${IG_PASSWORD:-}
     volumes:
-      - ./cookies:/cookies
+      # Single source of truth: cookie-mint writes /root/cookie-vault/instagram.txt.
+      # Read-only so ig-parser/yt-dlp never clobber the freshly-minted session
+      # (yt-dlp's end-of-run cookie write-back becomes a harmless warning).
+      - /root/cookie-vault:/cookies:ro
       - ./logs:/logs
       - ./output:/output

@@ -1,0 +1,15 @@
+[
+  {
+    "type": "Video",
+    "shortCode": "VID123abc",
+    "caption": "My reel caption with #tags",
+    "url": "https://www.instagram.com/reel/VID123abc/",
+    "videoUrl": "https://cdn.example.com/reel.mp4",
+    "displayUrl": "https://cdn.example.com/thumb.jpg",
+    "ownerUsername": "creator",
+    "ownerFullName": "The Creator",
+    "timestamp": "2026-06-20T10:00:00.000Z",
+    "productType": "clips",
+    "videoDuration": 30.0
+  }
+]

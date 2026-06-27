@@ -1,0 +1,16 @@
+[
+  {
+    "type": "Sidecar",
+    "shortCode": "CAR456def",
+    "caption": "Swipe for tips",
+    "url": "https://www.instagram.com/p/CAR456def/",
+    "ownerUsername": "tipster",
+    "ownerFullName": "Tip Ster",
+    "timestamp": "2026-06-18T08:30:00.000Z",
+    "childPosts": [
+      {"type": "Image", "displayUrl": "https://cdn.example.com/s1.jpg"},
+      {"type": "Image", "displayUrl": "https://cdn.example.com/s2.jpg"},
+      {"type": "Video", "videoUrl": "https://cdn.example.com/s3.mp4", "displayUrl": "https://cdn.example.com/s3.jpg"}
+    ]
+  }
+]

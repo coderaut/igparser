@@ -123,6 +123,8 @@ def _patch_apify(monkeypatch, fixture_name):
         assert params["token"] == "test-token"
         assert json["resultsLimit"] == 1
         assert json["directUrls"]
+        assert json["resultsType"] == "posts"
+        assert json["addParentData"] is False
         return _FakeResp(json_data=items)
 
     def fake_get(url, headers=None, follow_redirects=None, timeout=None):
@@ -195,3 +197,14 @@ def test_fetch_post_http_error_raises(monkeypatch, tmp_path):
     monkeypatch.setattr(fetcher.httpx, "post", _fake_post)
     with pytest.raises(RuntimeError, match="Apify API error"):
         fetcher.fetch_post("https://www.instagram.com/p/ABC123/", tmp_path)
+
+
+def test_fetch_post_non_post_url_raises_runtime_error(monkeypatch, tmp_path):
+    """fetch_post must raise RuntimeError (not ValueError) for non-post URLs.
+
+    The _extract_shortcode call happens before the token check, so this fires
+    regardless of whether APIFY_TOKEN is set.
+    """
+    monkeypatch.delenv("APIFY_TOKEN", raising=False)
+    with pytest.raises(RuntimeError, match="Cannot extract shortcode"):
+        fetcher.fetch_post("https://www.instagram.com/someuser/", tmp_path)

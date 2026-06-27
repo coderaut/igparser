@@ -77,7 +77,10 @@ def fetch_post(url: str, work_dir: Path) -> tuple[Path | None, list[Path], str, 
     """
     log.info("fetch_post start: %s", url)
     work_dir.mkdir(parents=True, exist_ok=True)
-    _extract_shortcode(url)  # validate the URL is a post/reel before spending an Apify call
+    try:
+        _extract_shortcode(url)  # validate the URL is a post/reel before spending an Apify call
+    except ValueError as e:
+        raise RuntimeError(str(e)) from e
 
     token = os.getenv("APIFY_TOKEN", "").strip()
     if not token:

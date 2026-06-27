@@ -1,5 +1,16 @@
 # ig-parser Apify Fetch Backend — Implementation Plan
 
+> **⏳ STATUS (2026-06-27): RESUME AT TASK 5.** Tasks 1–4 are COMPLETE and reviewed clean
+> on branch `apify-fetch-backend` (commits b415636..9c41970): fetcher pure helpers + fixtures
+> (T1), `fetch_post` Apify orchestration with mocked-httpx tests incl. 401/timeout/http-error
+> paths (T2), CLI wiring `main.py` (T3), Streamlit wiring `app.py` + cookies-sidebar removal (T4).
+> 18 tests passing. SDD ledger: `.superpowers/sdd/progress.md` (authoritative). Per-task briefs/
+> reports/diffs live under `.superpowers/sdd/`. **Remaining: T5 (archive legacy + dep/Docker/env
+> cutover), T6 (docs), T7 (HUMAN-GATED live smoke — needs real `APIFY_TOKEN` + live network), then
+> the final whole-branch review.** Decision logged in the ledger: caption-only carousel fallback
+> `(None, [], caption, meta)` is INTENDED (do not re-flag). Resume by re-invoking
+> superpowers:subagent-driven-development; it checks the ledger and skips completed tasks.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. A fresh Sonnet subagent implements each task; the main model reviews between tasks. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace ig-parser's cookie/yt-dlp/instaloader Instagram fetch path with the Apify Instagram Scraper, keeping the entire local media-understanding pipeline (Whisper, Gemma vision, frame fallback, LLM formatting) unchanged.
@@ -43,7 +54,7 @@ Build the pure, I/O-free core first: shortcode validation, Apify-item classifica
   - `inject_source_line(markdown: str, meta: dict) -> str`
   - `meta` dict keys: `author`, `full_name`, `source_url`, `timestamp`, `type`, `shortcode`.
 
-- [ ] **Step 1: Create the venv and install dev deps**
+- [x] **Step 1: Create the venv and install dev deps**
 
 Run:
 ```bash
@@ -53,7 +64,7 @@ python3 -m venv .venv
 ```
 Expected: installs without error. (`.venv` is git-ignored and persists for later tasks.)
 
-- [ ] **Step 2: Add the pytest dev dependency to `pyproject.toml`**
+- [x] **Step 2: Add the pytest dev dependency to `pyproject.toml`**
 
 Insert after the `dependencies = [...]` block (after line 15), before `[tool.setuptools]`:
 ```toml
@@ -61,7 +72,7 @@ Insert after the `dependencies = [...]` block (after line 15), before `[tool.set
 dev = ["pytest>=8.0"]
 ```
 
-- [ ] **Step 3: Create the four Apify fixtures**
+- [x] **Step 3: Create the four Apify fixtures**
 
 `tests/fixtures/apify_video.json`:
 ```json
@@ -123,13 +134,13 @@ dev = ["pytest>=8.0"]
 []
 ```
 
-- [ ] **Step 4: Create `tests/__init__.py`**
+- [x] **Step 4: Create `tests/__init__.py`**
 
 Create an empty file:
 ```python
 ```
 
-- [ ] **Step 5: Write the failing tests for the pure helpers**
+- [x] **Step 5: Write the failing tests for the pure helpers**
 
 `tests/test_fetcher.py`:
 ```python
@@ -228,7 +239,7 @@ def test_inject_source_line_empty_meta_noop():
     assert fetcher.inject_source_line(md, {}) == md
 ```
 
-- [ ] **Step 6: Run the tests to verify they fail**
+- [x] **Step 6: Run the tests to verify they fail**
 
 Run:
 ```bash
@@ -236,7 +247,7 @@ cd "/root/Repo Apps/IG Parser" && .venv/bin/python -m pytest tests/test_fetcher.
 ```
 Expected: FAIL — `ModuleNotFoundError: No module named 'fetcher'` (or collection error).
 
-- [ ] **Step 7: Implement the pure helpers in `fetcher.py`**
+- [x] **Step 7: Implement the pure helpers in `fetcher.py`**
 
 Create `fetcher.py`:
 ```python
@@ -330,7 +341,7 @@ def inject_source_line(markdown: str, meta: dict) -> str:
     return line + "\n\n" + markdown
 ```
 
-- [ ] **Step 8: Run the tests to verify they pass**
+- [x] **Step 8: Run the tests to verify they pass**
 
 Run:
 ```bash
@@ -338,7 +349,7 @@ cd "/root/Repo Apps/IG Parser" && .venv/bin/python -m pytest tests/test_fetcher.
 ```
 Expected: PASS — all 10 test cases green (the shortcode test is parametrized into 3).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 cd "/root/Repo Apps/IG Parser"
@@ -362,7 +373,7 @@ Add the I/O layer: call Apify, download media to disk, return the 4-tuple. Teste
   - `fetch_post(url: str, work_dir: Path) -> tuple[Path | None, list[Path], str, dict]` — `(video_path, image_paths, caption, meta)`. Raises `RuntimeError` on missing token, Apify error/timeout, or an empty (inaccessible-post) dataset.
   - `_download_media(url: str, dest: Path) -> Path`
 
-- [ ] **Step 1: Write the failing orchestration tests**
+- [x] **Step 1: Write the failing orchestration tests**
 
 Append to `tests/test_fetcher.py`:
 ```python
@@ -437,7 +448,7 @@ def test_fetch_post_missing_token_raises(monkeypatch, tmp_path):
         fetcher.fetch_post("https://www.instagram.com/p/ABC123/", tmp_path)
 ```
 
-- [ ] **Step 2: Run the new tests to verify they fail**
+- [x] **Step 2: Run the new tests to verify they fail**
 
 Run:
 ```bash
@@ -445,7 +456,7 @@ cd "/root/Repo Apps/IG Parser" && .venv/bin/python -m pytest tests/test_fetcher.
 ```
 Expected: FAIL — `AttributeError: module 'fetcher' has no attribute 'fetch_post'`.
 
-- [ ] **Step 3: Implement `_download_media` and `fetch_post`**
+- [x] **Step 3: Implement `_download_media` and `fetch_post`**
 
 Append to `fetcher.py`:
 ```python
@@ -522,7 +533,7 @@ def fetch_post(url: str, work_dir: Path) -> tuple[Path | None, list[Path], str, 
     return None, image_paths, caption, meta
 ```
 
-- [ ] **Step 4: Run the full test file to verify all pass**
+- [x] **Step 4: Run the full test file to verify all pass**
 
 Run:
 ```bash
@@ -530,7 +541,7 @@ cd "/root/Repo Apps/IG Parser" && .venv/bin/python -m pytest tests/test_fetcher.
 ```
 Expected: PASS — 14 test cases green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd "/root/Repo Apps/IG Parser"
@@ -551,7 +562,7 @@ Swap `download_reel` for `fetch_post`, unpack the 4-tuple, and apply the source-
 **Interfaces:**
 - Consumes: `fetch_post`, `inject_source_line` (Tasks 1-2); `extract_content` (unchanged, returns `(markdown, slug)`).
 
-- [ ] **Step 1: Write the failing CLI test**
+- [x] **Step 1: Write the failing CLI test**
 
 Create `tests/test_cli.py`:
 ```python
@@ -590,7 +601,7 @@ def test_cli_writes_markdown_with_attribution(monkeypatch, tmp_path):
     assert "Formatted body." in out
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run:
 ```bash
@@ -598,7 +609,7 @@ cd "/root/Repo Apps/IG Parser" && .venv/bin/python -m pytest tests/test_cli.py -
 ```
 Expected: FAIL — `main` still imports `download_reel` (ImportError once Task 5 runs) or the attribution line is missing / fetch unpack mismatch. (At this point it fails because `main` has no `fetch_post` attribute to patch and still calls the 3-tuple `download_reel`.)
 
-- [ ] **Step 3: Update the imports in `main.py`**
+- [x] **Step 3: Update the imports in `main.py`**
 
 Replace line 8:
 ```python
@@ -609,7 +620,7 @@ with:
 from fetcher import fetch_post, inject_source_line
 ```
 
-- [ ] **Step 4: Update the download call in `main.py`**
+- [x] **Step 4: Update the download call in `main.py`**
 
 Replace lines 42-43:
 ```python
@@ -622,7 +633,7 @@ with:
             video_path, image_paths, yt_caption, meta = fetch_post(url, work_dir)
 ```
 
-- [ ] **Step 5: Apply the attribution line in the save block of `main.py`**
+- [x] **Step 5: Apply the attribution line in the save block of `main.py`**
 
 Replace lines 106-115:
 ```python
@@ -653,7 +664,7 @@ with:
         out_file.write_text(result_md, encoding="utf-8")
 ```
 
-- [ ] **Step 6: Run the CLI test to verify it passes**
+- [x] **Step 6: Run the CLI test to verify it passes**
 
 Run:
 ```bash
@@ -661,7 +672,7 @@ cd "/root/Repo Apps/IG Parser" && .venv/bin/python -m pytest tests/test_cli.py -
 ```
 Expected: PASS.
 
-- [ ] **Step 7: Run the whole suite**
+- [x] **Step 7: Run the whole suite**
 
 Run:
 ```bash
@@ -669,7 +680,7 @@ cd "/root/Repo Apps/IG Parser" && .venv/bin/python -m pytest -v
 ```
 Expected: PASS — all tests across `test_fetcher.py` and `test_cli.py` green.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd "/root/Repo Apps/IG Parser"
@@ -689,7 +700,7 @@ Mirror the CLI changes in the dashboard. Streamlit executes on import, so verifi
 **Interfaces:**
 - Consumes: `fetch_post`, `inject_source_line` (Tasks 1-2).
 
-- [ ] **Step 1: Update imports in `app.py`**
+- [x] **Step 1: Update imports in `app.py`**
 
 Replace line 11:
 ```python
@@ -700,7 +711,7 @@ with:
 from fetcher import fetch_post, inject_source_line
 ```
 
-- [ ] **Step 2: Remove the cookies sidebar (now obsolete) from `app.py`**
+- [x] **Step 2: Remove the cookies sidebar (now obsolete) from `app.py`**
 
 Delete line 21:
 ```python
@@ -728,7 +739,7 @@ with st.sidebar:
 ```
 (Leave the surrounding `st.title` / `st.caption` lines intact.)
 
-- [ ] **Step 3: Update the download call in `app.py`**
+- [x] **Step 3: Update the download call in `app.py`**
 
 Replace line 68:
 ```python
@@ -739,7 +750,7 @@ with:
             video_path, image_paths, yt_caption, meta = fetch_post(url.strip(), WORK_DIR)
 ```
 
-- [ ] **Step 4: Apply the attribution line in `app.py`**
+- [x] **Step 4: Apply the attribution line in `app.py`**
 
 Replace line 145:
 ```python
@@ -751,7 +762,7 @@ with:
             result_md = inject_source_line(result_md, meta)
 ```
 
-- [ ] **Step 5: Byte-compile to verify no syntax/import errors**
+- [x] **Step 5: Byte-compile to verify no syntax/import errors**
 
 Run:
 ```bash
@@ -759,7 +770,7 @@ cd "/root/Repo Apps/IG Parser" && .venv/bin/python -m py_compile app.py && echo 
 ```
 Expected: `OK` (no traceback).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd "/root/Repo Apps/IG Parser"

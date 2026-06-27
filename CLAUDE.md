@@ -1,12 +1,19 @@
 # ig parser
 
-> **⏳ PENDING MIGRATION (2026-06-27) — read before changing the fetch path.** An
-> approved spec + implementation plan exist to replace the cookie/yt-dlp/instaloader
-> fetch path with the **Apify Instagram Scraper** (keeping all OCR/Whisper unchanged).
-> Work lives on branch `apify-fetch-backend`. Not yet implemented — `master` still
-> uses cookies. To implement: follow `docs/superpowers/plans/2026-06-27-ig-parser-apify-fetch.md`
-> via the superpowers `subagent-driven-development` skill (Sonnet subagents, main-model
-> review per task). Spec: `docs/superpowers/specs/2026-06-27-ig-parser-apify-fetch-design.md`.
+> **⏳ MIGRATION IN PROGRESS (2026-06-27) — resume at Task 5; read before changing the fetch path.**
+> Replacing the cookie/yt-dlp/instaloader fetch path with the **Apify Instagram Scraper** (OCR/Whisper
+> pipeline unchanged), on branch `apify-fetch-backend`. **Tasks 1–4 DONE & reviewed clean** (commits
+> b415636..9c41970): new `fetcher.py` with `fetch_post()`/`inject_source_line()` (18 tests passing),
+> CLI (`main.py`) and Streamlit (`app.py`) wired over, cookies sidebar removed. **The cookie sections
+> below this banner are now STALE on this branch** — they describe the pre-migration `master` and are
+> rewritten by Task 6. **Remaining: T5** (archive `downloader.py`/`detector.py` → `legacy/`, strip
+> yt-dlp/instaloader deps, Docker/env cutover to `APIFY_TOKEN`), **T6** (rewrite these docs), **T7**
+> (HUMAN-GATED live smoke — needs real `APIFY_TOKEN` + network), then final whole-branch review.
+> Resume: re-invoke superpowers `subagent-driven-development` — it reads the SDD ledger
+> (`.superpowers/sdd/progress.md`, git-ignored) and skips completed tasks. Plan:
+> `docs/superpowers/plans/2026-06-27-ig-parser-apify-fetch.md`. Spec:
+> `docs/superpowers/specs/2026-06-27-ig-parser-apify-fetch-design.md`.
+> Decision logged: caption-only carousel fallback `(None, [], caption, meta)` is INTENDED — do not "fix".
 
 Downloads public Instagram Reels and static posts and formats them as clean markdown. All text is extracted first (caption + transcript or image text), then a single LLM pass chooses the appropriate structure and formats the content — no predefined type templates, nothing discarded.
 
